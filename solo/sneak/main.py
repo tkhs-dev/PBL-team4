@@ -1,4 +1,3 @@
-# For more info see docs.battlesnake.com test
 import random
 import typing
 
