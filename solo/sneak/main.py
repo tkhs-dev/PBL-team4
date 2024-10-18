@@ -27,6 +27,7 @@ def get_snake_foods(game_state: dict) -> int:
            
     return food
 
+
 # start is called when your Battlesnake begins a game
 def start(game_state: typing.Dict):
     print("GAME START")
