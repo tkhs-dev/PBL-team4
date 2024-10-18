@@ -5,13 +5,13 @@
 
 
 
-蛇の長さ
+#蛇の長さ
 def get_snake_length(game_state: dict) -> int:
     length = game_state["you"]["length"]
 
     return length
 
-ヘルス
+#ヘルス
 def get_snake_health(game_state: dict) -> int:
     health = game_state["you"]["health"]
 
