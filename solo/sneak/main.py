@@ -1,5 +1,4 @@
-# This file can be a nice home for your Battlesnake logic and helper functions.
-#
+
 # To get you started we've included code to prevent your Battlesnake from moving backwards.
 # For more info see docs.battlesnake.com test
 import random
