@@ -47,8 +47,17 @@ def move(game_state: typing.Dict) -> typing.Dict:
         is_move_safe["up"] = False
 
     # TODO: Step 1 - Prevent your Battlesnake from moving out of bounds
-    # board_width = game_state['board']['width']
-    # board_height = game_state['board']['height']
+    board_width = game_state['board']['width']
+    board_height = game_state['board']['height']
+    head_coords = game_state['you']['head']
+    if head_coords['x'] == 0:
+        is_move_safe['left'] = False
+    if head_coords['x'] == board_width - 1:
+        is_move_safe['right'] = False
+    if head_coords['y'] == 0:
+        is_move_safe['down'] = False
+    if head_coords['y'] == board_height - 1:
+        is_move_safe['up'] = False
 
     # TODO: Step 2 - Prevent your Battlesnake from colliding with itself
     # my_body = game_state['you']['body']
