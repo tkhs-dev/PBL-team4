@@ -15,30 +15,9 @@ def info() -> typing.Dict:
         "tail": "default",  # TODO: Choose tail
     }
 
-def get_snake_foods(game_state: dict) -> int:
-    food_max=0
-    my_head=game_state["you"]["head"]
-
-    for i in range(3):
-       feed=game_state["board"]["food"][i] 
-       food=abs(my_head["x"]-feed[x])+abs(my_head["y"]-feed["y"])
-       if food >= food_max:
-          food_max=food
-           
-    return food
-
 # start is called when your Battlesnake begins a game
 def start(game_state: typing.Dict):
     print("GAME START")
-
-def get_snake_distance(game_state: dict) -> int:
-    coordinate_x = game_state["you"]["head"]["x"]
-    coordinate_y = game_state["you"]["head"]["y"]
-    x_distance = 7 - coordinate_x
-    y_distance = 7 - coordinate_y
-    min_distance = min(coordinate_x, coordinate_y, x_distance, y_distance)
-    return min_distance
-
 
 # end is called when your Battlesnake finishes a game
 def end(game_state: typing.Dict):
