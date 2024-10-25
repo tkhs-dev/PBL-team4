@@ -7,7 +7,7 @@ class Evaluator(nn.Module):
     def __init__(self):
         super(Evaluator, self).__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(8, 20),
+            nn.Linear(9, 20),
             nn.ReLU(),
             nn.Linear(20, 20),
             nn.ReLU(),
@@ -16,6 +16,5 @@ class Evaluator(nn.Module):
         return
 
     def forward(self, x):
-        x = self.flatten(x)
         logits = self.linear_relu_stack(x)
         return logits

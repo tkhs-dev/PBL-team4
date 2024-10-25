@@ -1,7 +1,12 @@
 import os
-import random
 import typing
 import sys
+
+import torch
+
+from shared.parameter_util import get_front_body, get_left_body, get_right_body, get_leftd_body, get_rightd_body, \
+    get_snake_health, get_snake_distance, get_snake_foods, get_snake_length
+from solo.sneak.evaluator import Evaluator
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from shared import rule
@@ -43,8 +48,31 @@ def move(game_state: typing.Dict) -> typing.Dict:
     ))
     if len(safe_moves) == 0:
         return {"move": "up"}
-    next_move = random.choice(safe_moves)
-    return {"move": next_move[0].value}
+    choice = max(map(
+        lambda x: (x[0], evaluate(x[1][1])),
+        safe_moves
+        ),
+        key=lambda x: x[1]
+    )
+    return {"move": choice[0].value}
+
+def evaluate(game_state: typing.Dict) -> torch.Tensor:
+    return Evaluator()(get_input_tensor(game_state))
+
+def get_input_tensor(game_state: typing.Dict) -> torch.Tensor:
+    return torch.Tensor(
+        [
+            get_front_body(game_state),
+            get_left_body(game_state),
+            get_right_body(game_state),
+            get_leftd_body(game_state),
+            get_rightd_body(game_state),
+            get_snake_length(game_state),
+            get_snake_health(game_state),
+            get_snake_distance(game_state),
+            get_snake_foods(game_state)
+        ]
+    )
 
 
 # Start server when `python main.py` is run
