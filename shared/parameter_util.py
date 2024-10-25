@@ -75,18 +75,6 @@ def get_left_body(game_state: dict) -> int:
         r += 1
     return r
 
-def get_snake_foods(game_state: dict) -> int:
-    food_min=36
-    my_head=game_state["you"]["head"]
-
-    for i in range(3):
-        feed=game_state["board"]["food"][i]
-        food=abs(my_head["x"]-feed["x"])+abs(my_head["y"]-feed["y"])
-        if food_min >=  food:
-            food_min=food
-    
-    return food_min
-
 def get_leftd_body(game_state: dict) -> int:
     r = 0
     head = game_state["you"]["head"]
@@ -111,17 +99,18 @@ def get_leftd_body(game_state: dict) -> int:
         r += 1
     return r
 
+#餌との最短距離
 def get_snake_foods(game_state: dict) -> int:
-    food_max=0
+    food_min=36
     my_head=game_state["you"]["head"]
 
     for i in range(3):
         feed=game_state["board"]["food"][i]
         food=abs(my_head["x"]-feed["x"])+abs(my_head["y"]-feed["y"])
-        if food >= food_max:
-            food_max=food
-
-    return food
+        if food_min >=  food:
+            food_min=food
+    
+    return food_min
 
 #壁との距離
 def get_snake_distance(game_state: dict) -> int:
