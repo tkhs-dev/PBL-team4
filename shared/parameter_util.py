@@ -67,6 +67,7 @@ def get_snake_foods(game_state: dict) -> int:
 
     return food
 
+#壁との距離
 def get_snake_distance(game_state: dict) -> int:
     coordinate_x = game_state["you"]["head"]["x"]
     coordinate_y = game_state["you"]["head"]["y"]
