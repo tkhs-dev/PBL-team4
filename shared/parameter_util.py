@@ -56,14 +56,14 @@ def get_left_body(game_state: dict) -> int:
     return r
 
 def get_snake_foods(game_state: dict) -> int:
-    food_max=0
+    food_min=0
     my_head=game_state["you"]["head"]
 
     for i in range(3):
         feed=game_state["board"]["food"][i]
         food=abs(my_head["x"]-feed["x"])+abs(my_head["y"]-feed["y"])
-        if food >= food_max:
-            food_max=food
+        if food_min >=  food:
+            food_min=food
 
     return food
 
