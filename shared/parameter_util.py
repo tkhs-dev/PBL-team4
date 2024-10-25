@@ -60,8 +60,8 @@ def get_snake_foods(game_state: dict) -> int:
     my_head=game_state["you"]["head"]
 
     for i in range(3):
-        feed=game_state["board"]["food"][i]
-        food=abs(my_head["x"]-feed["x"])+abs(my_head["y"]-feed["y"])
+        food=game_state["board"]["food"][i]
+        food=abs(my_head["x"]-food["x"])+abs(my_head["y"]-food["y"])
         if food >= food_max:
             food_max=food
 
