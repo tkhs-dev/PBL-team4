@@ -1,6 +1,5 @@
 import copy
 from enum import Enum
-from re import match
 
 
 class TurnResult(Enum):

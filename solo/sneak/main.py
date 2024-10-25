@@ -1,8 +1,11 @@
+import os
 import random
 import typing
+import sys
 
-import shared.rule
-from shared.rule import Direction, TurnResult
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+from shared import rule
+from shared.rule import TurnResult, Direction
 
 
 # info is called when you create your Battlesnake on play.battlesnake.com
@@ -34,7 +37,7 @@ def move(game_state: typing.Dict) -> typing.Dict:
     safe_moves = list(filter(
         lambda x: x[1][0] is TurnResult.CONTINUE,
         map(
-            lambda x:  (x,shared.rule.move(game_state, x)),
+            lambda x:  (x,rule.move(game_state, x)),
             Direction
         )
     ))
