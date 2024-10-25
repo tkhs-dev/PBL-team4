@@ -1,6 +1,4 @@
 # 盤面を評価するニューラルネットワークを定義する
-import torch
-
 from torch import nn
 
 class Evaluator(nn.Module):

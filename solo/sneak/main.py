@@ -4,13 +4,12 @@ import sys
 
 import torch
 
-from shared.parameter_util import get_front_body, get_left_body, get_right_body, get_leftd_body, get_rightd_body, \
-    get_snake_health, get_snake_distance, get_snake_foods, get_snake_length
-from solo.sneak.evaluator import Evaluator
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from shared import rule
 from shared.rule import TurnResult, Direction
+from shared.parameter_util import get_front_body, get_left_body, get_right_body, get_leftd_body, get_rightd_body, \
+    get_snake_health, get_snake_distance, get_snake_foods, get_snake_length
+from solo.sneak.evaluator import Evaluator
 
 
 # info is called when you create your Battlesnake on play.battlesnake.com
