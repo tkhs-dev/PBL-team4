@@ -15,30 +15,9 @@ def info() -> typing.Dict:
         "tail": "default",  # TODO: Choose tail
     }
 
-def get_snake_foods(game_state: dict) -> int:
-    food_max=0
-    my_head=game_state["you"]["head"]
-
-    for i in range(3):
-       feed=game_state["board"]["food"][i] 
-       food=abs(my_head["x"]-feed[x])+abs(my_head["y"]-feed["y"])
-       if food >= food_max:
-          food_max=food
-           
-    return food
-
 # start is called when your Battlesnake begins a game
 def start(game_state: typing.Dict):
     print("GAME START")
-
-def get_snake_distance(game_state: dict) -> int:
-    coordinate_x = game_state["you"]["head"]["x"]
-    coordinate_y = game_state["you"]["head"]["y"]
-    x_distance = 7 - coordinate_x
-    y_distance = 7 - coordinate_y
-    min_distance = min(coordinate_x, coordinate_y, x_distance, y_distance)
-    return min_distance
-
 
 # end is called when your Battlesnake finishes a game
 def end(game_state: typing.Dict):
@@ -68,8 +47,17 @@ def move(game_state: typing.Dict) -> typing.Dict:
         is_move_safe["up"] = False
 
     # TODO: Step 1 - Prevent your Battlesnake from moving out of bounds
-    # board_width = game_state['board']['width']
-    # board_height = game_state['board']['height']
+    board_width = game_state['board']['width']
+    board_height = game_state['board']['height']
+    head_coords = game_state['you']['head']
+    if head_coords['x'] == 0:
+        is_move_safe['left'] = False
+    if head_coords['x'] == board_width - 1:
+        is_move_safe['right'] = False
+    if head_coords['y'] == 0:
+        is_move_safe['down'] = False
+    if head_coords['y'] == board_height - 1:
+        is_move_safe['up'] = False
 
     # TODO: Step 2 - Prevent your Battlesnake from colliding with itself
     # my_body = game_state['you']['body']
