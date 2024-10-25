@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import typing
 
 from flask import Flask
@@ -21,8 +22,12 @@ def run_server(handlers: typing.Dict):
 
     @app.post("/move")
     def on_move():
+        start = time.time()
         game_state = request.get_json()
-        return handlers["move"](game_state)
+        result = handlers["move"](game_state)
+        end = time.time()
+        print(f"Elapsed time: {(end - start)*1000}ms")
+        return result
 
     @app.post("/end")
     def on_end():
