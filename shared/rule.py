@@ -1,17 +1,29 @@
 import copy
 from enum import Enum
+from re import match
+
 
 class TurnResult(Enum):
-    CONTINUE = 1
-    WIN = 2
-    LOSE = 3
-    DRAW = 4
+    CONTINUE = 0
+    WIN = 1
+    LOSE = 2
+    DRAW = 3
 
 class Direction(Enum):
-    UP = (0,1,"up")
-    DOWN = (0,-1,"down")
-    LEFT = (1,0,"left")
-    RIGHT = (0,1,"right")
+    UP = "up"
+    DOWN = "down"
+    LEFT = "left"
+    RIGHT = "right"
+
+    def get_direction_pair(self) -> (int,int):
+        if self == Direction.UP:
+            return 0,1
+        elif self == Direction.DOWN:
+            return 0,-1
+        elif self == Direction.LEFT:
+            return -1,0
+        elif self == Direction.RIGHT:
+            return 1,0
 
 def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     #------ IMPORTANT ------
@@ -21,11 +33,13 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     #次の状態に変更するなどの場合は,以下のnext_stateを変更し,戻り値として返すこと
     next_state = copy.deepcopy(game_state)
     next_head = copy.deepcopy(next_state["you"]["head"])
-    next_head["x"] += direction.value[0]
-    next_head["y"] += direction.value[1]
+    next_head["x"] += direction.get_direction_pair()[0]
+    next_head["y"] += direction.get_direction_pair()[1]
 
     #何らかの衝突があるかどうかを判定し,それに応じて処理、結果を返す
     if _is_head_out_of_bounds(game_state, next_head):
+        return TurnResult.LOSE, None
+    elif _is_head_colliding_with_self(game_state, next_head):
         return TurnResult.LOSE, None
     elif (snake := _is_head_colliding_with_other_snake(game_state, next_head)) is not None:
         #snakeには衝突したsnakeのdictが入る
@@ -33,8 +47,6 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         #体に接触した場合はこちらの負け
         #TODO
         pass
-    elif _is_head_colliding_with_self(game_state, next_head):
-        return TurnResult.LOSE, None
 
 
     if _is_head_colliding_with_food(game_state, next_head):
@@ -52,7 +64,7 @@ def _is_head_out_of_bounds(game_state:dict, next_head:(int,int)) -> bool:
     return next_head["x"] < 0 or next_head["x"] >= game_state["board"]["width"] or next_head["y"] < 0 or next_head["y"] >= game_state["board"]["height"]
 
 def _is_head_colliding_with_self(game_state:dict, next_head:(int,int)) -> bool:
-    return next_head in game_state["you"]["body"][:game_state["you"]["length"]-1]
+    return next_head in game_state["you"]["body"][:game_state["you"]["length"]]
 
 def _is_head_colliding_with_other_snake(game_state:dict, next_head:(int,int)) -> dict | None: #return snake dict or None
     for snake in game_state["board"]["snakes"]:
