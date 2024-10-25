@@ -2,8 +2,8 @@ import unittest
 import json
 from unittest import TestCase
 
-from shared.parameter_util import get_snake_foods, get_up_body, get_snake_health, get_snake_length, get_snake_distance, \
-    get_down_body, get_right_body, get_left_body
+from shared.parameter_util import get_snake_foods, get_front_body, get_snake_health, get_snake_length, \
+    get_snake_distance, get_right_body, get_left_body, get_leftd_body, get_rightd_body
 
 # test json
 json_text = """
@@ -16,14 +16,9 @@ if __name__ == '__main__':
 
 
 class Test(TestCase):
-    def test_get_up_body(self):
+    def test_get_front_body(self):
         expect = 0
-        actual = get_up_body(json)
-        self.assertEqual(expect, actual)
-
-    def test_get_down_body(self):
-        expect = 0
-        actual = get_down_body(json)
+        actual = get_front_body(json)
         self.assertEqual(expect, actual)
 
     def test_get_right_body(self):
@@ -31,13 +26,23 @@ class Test(TestCase):
         actual = get_right_body(json)
         self.assertEqual(expect, actual)
 
+    def test_get_rightd_body(self):
+        expect = 1
+        actual = get_rightd_body(json)
+        self.assertEqual(expect, actual)
+
     def test_get_left_body(self):
         expect = 0
         actual = get_left_body(json)
         self.assertEqual(expect, actual)
 
+    def test_get_leftd_body(self):
+        expect = 0
+        actual = get_leftd_body(json)
+        self.assertEqual(expect, actual)
+
     def test_get_snake_foods(self):
-        expect = 3
+        expect = 1
         actual = get_snake_foods(json)
         self.assertEqual(expect, actual)
 
