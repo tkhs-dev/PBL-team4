@@ -55,8 +55,8 @@ def move(game_state: typing.Dict) -> typing.Dict:
     )
     return {"move": choice[0].value}
 
-def evaluate(game_state: typing.Dict) -> torch.Tensor:
-    return Evaluator()(get_input_tensor(game_state))
+def evaluate(game_state: typing.Dict) -> float:
+    return Evaluator()(get_input_tensor(game_state)).item()
 
 def get_input_tensor(game_state: typing.Dict) -> torch.Tensor:
     return torch.Tensor(
