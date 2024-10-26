@@ -47,10 +47,12 @@ def move(game_state: typing.Dict) -> typing.Dict:
     ))
     if len(safe_moves) == 0:
         return {"move": "up"}
-    choice = max(map(
+    ev = list(map(
         lambda x: (x[0], evaluate(x[1][1])),
         safe_moves
-        ),
+    ))
+    print(ev)
+    choice = max(ev,
         key=lambda x: x[1]
     )
     return {"move": choice[0].value}
