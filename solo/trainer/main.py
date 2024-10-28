@@ -34,34 +34,44 @@ def move_callback(state, player):
         return 3
 
 def evaluate(individual):
-    model = EvaluatorModel()
-    # 重みをモデルにセット
-    start = 0
-    for param in model.parameters():
-        numel = param.data.numel()
-        param.data = torch.tensor(individual[start:start+numel]).reshape(param.data.shape)
-        start += numel
+    results = []
+    for i in range(5):
+        model = EvaluatorModel()
+        # 重みをモデルにセット
+        start = 0
+        for param in model.parameters():
+            param_shape = param.data.shape
+            param_size = param.data.numel()  # 要素数
+            param_data = individual[start:start + param_size]
 
-    evaluator = Evaluator()
-    evaluator.model = model
+            param.data.copy_(torch.tensor(param_data).view(param_shape))
+            start += param_size
 
-    # ゲーム開始
-    player = AIPlayer(evaluator)
-    client = Client()
-    client.on_start = CALLBACKFUNC(lambda state: 0)
-    client.on_end = CALLBACKFUNC(lambda state: 0)
-    client.on_move = CALLBACKFUNC(lambda state: move_callback(state, player))
+        evaluator = Evaluator()
+        evaluator.model = model
 
-    setting = GameSettings()
-    setting.seed = 0
-    setting.width = 6
-    setting.height = 6
-    setting.food_spawn_chance = 0
-    setting.minimum_food = 3
+        # ゲーム開始
+        player = AIPlayer(evaluator)
+        client = Client()
+        client.on_start = CALLBACKFUNC(lambda state: 0)
+        client.on_end = CALLBACKFUNC(lambda state: 0)
+        client.on_move = CALLBACKFUNC(lambda state: move_callback(state, player))
 
-    result = start_solo_game(client, setting)
+        setting = GameSettings()
+        setting.seed = random.randint(0, 100000)
+        setting.width = 6
+        setting.height = 6
+        setting.food_spawn_chance = 0
+        setting.minimum_food = 3
 
-    return result["turn"],
+        result = start_solo_game(client, setting)
+        score = result["turn"]
+        if result["you"]["health"] <= 0:
+            score -= 200
+        if (result["turn"]+200)/100 - result["you"]["length"] < 2 & result["you"]["length"] > 5:
+            score += 200
+        results.append(score)
+    return sum(results) / len(results),
 
 def train():
     creator.create("FitnessMin", base.Fitness, weights=(1.0,))
@@ -70,11 +80,11 @@ def train():
     toolbox.register("individual", tools.initIterate, creator.Individual, init_weights)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", evaluate)
-    toolbox.register("mate", tools.cxTwoPoint)
+    toolbox.register("mate", tools.cxBlend, alpha=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
     toolbox.register("select", tools.selTournament, tournsize=3)
-    population = toolbox.population(n=100)
-    CXPB, MUTPB, NGEN = 0.5, 0.2, 40
+    population = toolbox.population(n=30)
+    CXPB, MUTPB, NGEN = 0.5, 0.2, 100
     print("Start of evolution")
     fitnesses = list(map(toolbox.evaluate, population))
     for ind, fit in zip(population, fitnesses):
@@ -115,12 +125,33 @@ def train():
     model = EvaluatorModel()
     start = 0
     for param in model.parameters():
-        numel = param.data.numel()
-        param.data = torch.tensor(best_ind[start:start+numel]).reshape(param.data.shape)
-        start += numel
-    evaluator = Evaluator()
-    evaluator.model = model
-    evaluator.save("solo/sneak/evaluator.pth")
+        param_shape = param.data.shape
+        param_size = param.data.numel()  # 要素数
+        param_data = best_ind[start:start + param_size]
+        param.data.copy_(torch.tensor(param_data).view(param_shape))
+        start += param_size
+    model.save("../evaluator.pth")
+
+def test():
+    evaluator = Evaluator.load("../evaluator.pth")
+
+    # ゲーム開始
+    player = AIPlayer(evaluator)
+    client = Client()
+    client.on_start = CALLBACKFUNC(lambda state: 0)
+    client.on_end = CALLBACKFUNC(lambda state: 0)
+    client.on_move = CALLBACKFUNC(lambda state: move_callback(state, player))
+
+    setting = GameSettings()
+    setting.seed = 10111
+    setting.width = 6
+    setting.height = 6
+    setting.food_spawn_chance = 0
+    setting.minimum_food = 3
+
+    result = start_solo_game(client, setting)
+    print(result)
 
 if __name__ == "__main__":
-    train()
+    # train()
+    test()
