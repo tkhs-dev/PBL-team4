@@ -106,8 +106,8 @@ func StartSoloGame(client C.Client, setting C.GameSetting) {
 	startGame([]*Client{c}, s)
 }
 
-//export StartDualGame
-func StartDualGame(client1 C.Client, client2 C.Client, setting C.GameSetting) {
+//export StartDuelGame
+func StartDuelGame(client1 C.Client, client2 C.Client, setting C.GameSetting) {
 	c1 := clientFromCStruct(client1)
 	c2 := clientFromCStruct(client2)
 	s := gameSettingFromCStruct(setting)
