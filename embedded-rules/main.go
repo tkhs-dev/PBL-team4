@@ -69,6 +69,13 @@ type GameState struct {
 	snakeStates map[string]SnakeState
 }
 
+type GameResult struct {
+	Result string
+	Turn   int
+	You    client.Snake
+	Snakes []client.Snake
+}
+
 func (c *Client) callOnStart() {
 	C.callCallback(c.onStart, C.CString(""))
 }
@@ -100,21 +107,37 @@ func gameSettingFromCStruct(strct C.GameSetting) *GameSetting {
 }
 
 //export StartSoloGame
-func StartSoloGame(client C.Client, setting C.GameSetting) {
+func StartSoloGame(client C.Client, setting C.GameSetting) *C.char {
 	c := clientFromCStruct(client)
 	s := gameSettingFromCStruct(setting)
-	startGame([]*Client{c}, s)
+	res, err := startGame([]*Client{c}, s)
+	if err != nil {
+		return C.CString("")
+	}
+	bytes, err := json.Marshal(res)
+	if err != nil {
+		return C.CString("")
+	}
+	return C.CString(string(bytes))
 }
 
 //export StartDuelGame
-func StartDuelGame(client1 C.Client, client2 C.Client, setting C.GameSetting) {
+func StartDuelGame(client1 C.Client, client2 C.Client, setting C.GameSetting) *C.char {
 	c1 := clientFromCStruct(client1)
 	c2 := clientFromCStruct(client2)
 	s := gameSettingFromCStruct(setting)
-	startGame([]*Client{c1, c2}, s)
+	res, err := startGame([]*Client{c1, c2}, s)
+	if err != nil {
+		return C.CString("")
+	}
+	bytes, err := json.Marshal(res)
+	if err != nil {
+		return C.CString("")
+	}
+	return C.CString(string(bytes))
 }
 
-func startGame(clients []*Client, setting *GameSetting) {
+func startGame(clients []*Client, setting *GameSetting) (*GameResult, error) {
 	gameState := &GameState{gameSetting: setting}
 	gameState.gameId = "game-" + time.Now().Format("20060102150405")
 	gameState.snakeStates = make(map[string]SnakeState)
@@ -136,13 +159,13 @@ func startGame(clients []*Client, setting *GameSetting) {
 
 	gameOver, boardState, err := initializeBoard(gameState)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	for !gameOver { //メインループ
 		gameOver, boardState, err = gameState.createNextBoard(boardState)
 		if err != nil {
-			return
+			return nil, err
 		}
 	}
 
@@ -151,6 +174,32 @@ func startGame(clients []*Client, setting *GameSetting) {
 		requestBody := serialiseSnakeRequest(snakeRequest)
 		snakeState.Client.callOnEnd(string(requestBody))
 	}
+
+	var youSnake *rules.Snake
+	for _, snk := range boardState.Snakes {
+		if "snake-0" == snk.ID {
+			youSnake = &snk
+			break
+		}
+	}
+
+	var result string
+	if youSnake.EliminatedCause == rules.NotEliminated {
+		result = "win"
+	} else {
+		result = "lose"
+	}
+	if len(gameState.snakeStates) > 1 {
+		result = "draw"
+	}
+
+	return &GameResult{
+		Result: result,
+		Turn:   boardState.Turn,
+		You:    convertRulesSnake(*youSnake, gameState.snakeStates[youSnake.ID]),
+		Snakes: convertRulesSnakes(boardState.Snakes, gameState.snakeStates, true),
+	}, nil
+
 }
 
 func initializeBoard(gameState *GameState) (bool, *rules.BoardState, error) {
@@ -274,10 +323,10 @@ func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 	}
 }
 
-func convertRulesSnakes(snakes []rules.Snake, snakeStates map[string]SnakeState) []client.Snake {
+func convertRulesSnakes(snakes []rules.Snake, snakeStates map[string]SnakeState, includeEliminated bool) []client.Snake {
 	a := make([]client.Snake, 0)
 	for _, snake := range snakes {
-		if snake.EliminatedCause == rules.NotEliminated {
+		if snake.EliminatedCause == rules.NotEliminated || includeEliminated {
 			a = append(a, convertRulesSnake(snake, snakeStates[snake.ID]))
 		}
 	}
@@ -290,6 +339,6 @@ func convertStateToBoard(boardState *rules.BoardState, snakeStates map[string]Sn
 		Width:   boardState.Width,
 		Food:    client.CoordFromPointArray(boardState.Food),
 		Hazards: client.CoordFromPointArray(boardState.Hazards),
-		Snakes:  convertRulesSnakes(boardState.Snakes, snakeStates),
+		Snakes:  convertRulesSnakes(boardState.Snakes, snakeStates, false),
 	}
 }
