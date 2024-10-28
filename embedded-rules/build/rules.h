@@ -100,8 +100,8 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern __declspec(dllexport) void StartSoloGame(Client client, GameSetting setting);
-extern __declspec(dllexport) void StartDuelGame(Client client1, Client client2, GameSetting setting);
+extern __declspec(dllexport) char* StartSoloGame(Client client, GameSetting setting);
+extern __declspec(dllexport) char* StartDuelGame(Client client1, Client client2, GameSetting setting);
 
 #ifdef __cplusplus
 }
