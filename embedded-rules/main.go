@@ -70,10 +70,10 @@ type GameState struct {
 }
 
 type GameResult struct {
-	Result string
-	Turn   int
-	You    client.Snake
-	Snakes []client.Snake
+	Result string         `json:"result"`
+	Turn   int            `json:"turn"`
+	You    client.Snake   `json:"you"`
+	Snakes []client.Snake `json:"snakes"`
 }
 
 func (c *Client) callOnStart() {
