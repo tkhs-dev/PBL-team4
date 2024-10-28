@@ -3,9 +3,8 @@ import os
 import sys
 from abc import ABCMeta
 
-from solo.sneak.evaluator import Evaluator
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+from solo.sneak.evaluator import Evaluator
 from shared import rule
 from shared.rule import TurnResult, Direction
 

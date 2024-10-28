@@ -3,7 +3,7 @@ import typing
 from player import AIPlayer
 from evaluator import Evaluator
 
-evaluator = Evaluator.load("solo/sneak/evaluator.pth")
+evaluator = Evaluator.load("./evaluator.pth")
 
 # info is called when you create your Battlesnake on play.battlesnake.com
 # and controls your Battlesnake's appearance
