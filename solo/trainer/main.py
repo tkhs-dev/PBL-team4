@@ -1,14 +1,12 @@
-import json
 import os
-import sys
 import random
+import sys
 
 import torch
 from deap import creator, base
 from deap import tools
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-from shared.rule import Direction
 from solo.sneak.evaluator import EvaluatorModel, Evaluator
 from solo.sneak.player import AIPlayer
 from solo.trainer.rules import start_solo_game, Client, GameSettings, CALLBACKFUNC
@@ -21,17 +19,6 @@ def init_weights():
     for param in model.parameters():
         weights.extend(param.data.numpy().flatten())
     return weights
-
-def move_callback(state, player):
-    res = player.on_move(json.loads(state))
-    if res == Direction.UP:
-        return 0
-    elif res == Direction.DOWN:
-        return 1
-    elif res == Direction.LEFT:
-        return 2
-    elif res == Direction.RIGHT:
-        return 3
 
 def evaluate(individual):
     results = []
@@ -53,9 +40,7 @@ def evaluate(individual):
         # ゲーム開始
         player = AIPlayer(evaluator)
         client = Client()
-        client.on_start = CALLBACKFUNC(lambda state: 0)
-        client.on_end = CALLBACKFUNC(lambda state: 0)
-        client.on_move = CALLBACKFUNC(lambda state: move_callback(state, player))
+        client.on_move = lambda state: player.on_move(state)
 
         setting = GameSettings()
         setting.seed = random.randint(0, 100000)
@@ -83,7 +68,7 @@ def train():
     toolbox.register("mate", tools.cxBlend, alpha=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
     toolbox.register("select", tools.selTournament, tournsize=3)
-    population = toolbox.population(n=30)
+    population = toolbox.population(n=10)
     CXPB, MUTPB, NGEN = 0.5, 0.2, 100
     print("Start of evolution")
     fitnesses = list(map(toolbox.evaluate, population))
@@ -132,26 +117,5 @@ def train():
         start += param_size
     model.save("../evaluator.pth")
 
-def test():
-    evaluator = Evaluator.load("../evaluator.pth")
-
-    # ゲーム開始
-    player = AIPlayer(evaluator)
-    client = Client()
-    client.on_start = CALLBACKFUNC(lambda state: 0)
-    client.on_end = CALLBACKFUNC(lambda state: 0)
-    client.on_move = CALLBACKFUNC(lambda state: move_callback(state, player))
-
-    setting = GameSettings()
-    setting.seed = 10111
-    setting.width = 6
-    setting.height = 6
-    setting.food_spawn_chance = 0
-    setting.minimum_food = 3
-
-    result = start_solo_game(client, setting)
-    print(result)
-
 if __name__ == "__main__":
-    # train()
-    test()
+    train()
