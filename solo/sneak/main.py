@@ -1,7 +1,7 @@
 import typing
 
-from player import AIPlayer
 from evaluator import Evaluator
+from player import AIPlayer
 
 evaluator = Evaluator.load("./evaluator.pth")
 
