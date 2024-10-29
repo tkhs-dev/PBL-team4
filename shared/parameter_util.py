@@ -8,6 +8,8 @@ def get_front_body(game_state: dict) -> int:
     head = game_state["you"]["head"]
     body = game_state["you"]["body"]
     neck = game_state["you"]["body"][1]
+    check_point1 = {}
+    check_point2 = {}
     if neck == {"x": head["x"] - 1 , "y": head["y"]}:
         check_point1 = {"x": head["x"] + 1 , "y": head["y"]}
         check_point2 = {"x": head["x"] + 2 , "y": head["y"]}
@@ -32,6 +34,8 @@ def get_right_body(game_state: dict) -> int:
     head = game_state["you"]["head"]
     body = game_state["you"]["body"]
     neck = game_state["you"]["body"][1]
+    check_point1 = {}
+    check_point2 = {}
     if neck == {"x": head["x"] - 1 , "y": head["y"]}:
         check_point1 = {"x": head["x"] , "y": head["y"] - 1}
         check_point2 = {"x": head["x"] , "y": head["y"] - 2}
@@ -56,6 +60,8 @@ def get_left_body(game_state: dict) -> int:
     head = game_state["you"]["head"]
     body = game_state["you"]["body"]
     neck = game_state["you"]["body"][1]
+    check_point1 = {}
+    check_point2 = {}
     if neck == {"x": head["x"] - 1 , "y": head["y"]}:
         check_point1 = {"x": head["x"] , "y": head["y"] + 1}
         check_point2 = {"x": head["x"] , "y": head["y"] + 2}
@@ -80,6 +86,8 @@ def get_leftd_body(game_state: dict) -> int:
     head = game_state["you"]["head"]
     body = game_state["you"]["body"]
     neck = game_state["you"]["body"][1]
+    check_point1 = {}
+    check_point2 = {}
     if neck == {"x": head["x"] - 1 , "y": head["y"]}:
         check_point1 = {"x": head["x"] + 1 , "y": head["y"] + 1}
         check_point2 = {"x": head["x"] + 2 , "y": head["y"] + 1}
@@ -104,6 +112,8 @@ def get_rightd_body(game_state: dict) -> int:
     head = game_state["you"]["head"]
     body = game_state["you"]["body"]
     neck = game_state["you"]["body"][1]
+    check_point1 = {}
+    check_point2 = {}
     if neck == {"x": head["x"] - 1 , "y": head["y"]}:
         check_point1 = {"x": head["x"] + 1 , "y": head["y"] - 1}
         check_point2 = {"x": head["x"] + 2 , "y": head["y"] - 1}
@@ -128,8 +138,7 @@ def get_snake_foods(game_state: dict) -> int:
     food_min=36
     my_head=game_state["you"]["head"]
 
-    for i in range(3):
-        feed=game_state["board"]["food"][i]
+    for feed in game_state["board"]["food"]:
         food=abs(my_head["x"]-feed["x"])+abs(my_head["y"]-feed["y"])
         if food_min >=  food:
             food_min=food

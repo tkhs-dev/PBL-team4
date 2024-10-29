@@ -1,5 +1,5 @@
-import unittest
 import json
+import unittest
 from unittest import TestCase
 
 from shared.parameter_util import get_snake_foods, get_front_body, get_snake_health, get_snake_length, \
