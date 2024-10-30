@@ -40,6 +40,16 @@ class AIPlayer(IPlayer):
                 Direction
             )
         ))
+        safe_moves = list(filter(
+            lambda x: any(
+                map(
+                    lambda y: rule.move(x[1][1], y)[0] is TurnResult.CONTINUE,
+                    Direction
+                )
+            ),
+            safe_moves
+        ))
+
         if len(safe_moves) == 0:
             return Direction.UP
         ev = list(map(
