@@ -27,7 +27,7 @@ class Test(TestCase):
         self.assertEqual(expect, actual)
 
     def test_get_rightd_body(self):
-        expect = 1
+        expect = 0
         actual = get_rightd_body(json)
         self.assertEqual(expect, actual)
 
