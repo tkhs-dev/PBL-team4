@@ -1,6 +1,8 @@
 import os
 import random
 import sys
+import time
+from multiprocessing import Pool
 
 import torch
 from deap import creator, base
@@ -20,42 +22,56 @@ def init_weights():
         weights.extend(param.data.numpy().flatten())
     return weights
 
+def individual_to_model(individual):
+    model = EvaluatorModel()
+    start = 0
+    for param in model.parameters():
+        param_shape = param.data.shape
+        param_size = param.data.numel()  # 要素数
+        param_data = individual[start:start + param_size]
+        param.data.copy_(torch.tensor(param_data).view(param_shape))
+        start += param_size
+    return model
+
+def evaluate_single(individual):
+    model = EvaluatorModel()
+    # 重みをモデルにセット
+    start = 0
+    for param in model.parameters():
+        param_shape = param.data.shape
+        param_size = param.data.numel()  # 要素数
+        param_data = individual[start:start + param_size]
+
+        param.data.copy_(torch.tensor(param_data).view(param_shape))
+        start += param_size
+
+    evaluator = Evaluator()
+    evaluator.model = model
+
+    # ゲーム開始
+    player = AIPlayer(evaluator)
+    client = Client()
+    client.on_move = lambda state: player.on_move(state)
+
+    setting = GameSettings()
+    setting.seed = random.randint(0, 100000)
+    setting.width = 6
+    setting.height = 6
+    setting.food_spawn_chance = 0
+    setting.minimum_food = 3
+
+    result = start_solo_game(client, setting)
+    score = result["turn"]
+    if result["you"]["health"] <= 0:
+        score /= 2
+    if -10<=(result["turn"]+200) - result["you"]["length"]*100 < 0 and result["you"]["length"] > 5:
+        score *= 2
+    return score
+
+pool = None
+
 def evaluate(individual):
-    results = []
-    for i in range(5):
-        model = EvaluatorModel()
-        # 重みをモデルにセット
-        start = 0
-        for param in model.parameters():
-            param_shape = param.data.shape
-            param_size = param.data.numel()  # 要素数
-            param_data = individual[start:start + param_size]
-
-            param.data.copy_(torch.tensor(param_data).view(param_shape))
-            start += param_size
-
-        evaluator = Evaluator()
-        evaluator.model = model
-
-        # ゲーム開始
-        player = AIPlayer(evaluator)
-        client = Client()
-        client.on_move = lambda state: player.on_move(state)
-
-        setting = GameSettings()
-        setting.seed = random.randint(0, 100000)
-        setting.width = 6
-        setting.height = 6
-        setting.food_spawn_chance = 0
-        setting.minimum_food = 3
-
-        result = start_solo_game(client, setting)
-        score = result["turn"]
-        if result["you"]["health"] <= 0:
-            score -= 200
-        if (result["turn"]+200)/100 - result["you"]["length"] < 2 & result["you"]["length"] > 5:
-            score += 200
-        results.append(score)
+    results = pool.map(evaluate_single, [individual] * 5)
     return sum(results) / len(results),
 
 def train():
@@ -107,14 +123,7 @@ def train():
     print("-- End of (successful) evolution --")
     best_ind = tools.selBest(population, 1)[0]
     print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
-    model = EvaluatorModel()
-    start = 0
-    for param in model.parameters():
-        param_shape = param.data.shape
-        param_size = param.data.numel()  # 要素数
-        param_data = best_ind[start:start + param_size]
-        param.data.copy_(torch.tensor(param_data).view(param_shape))
-        start += param_size
+    model = individual_to_model(best_ind)
     model.save("../evaluator.pth")
 
 if __name__ == "__main__":
