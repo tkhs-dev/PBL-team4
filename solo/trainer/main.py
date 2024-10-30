@@ -11,7 +11,7 @@ from deap import tools
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from solo.sneak.evaluator import EvaluatorModel, Evaluator
 from solo.sneak.player import AIPlayer
-from solo.trainer.rules import start_solo_game, Client, GameSettings, CALLBACKFUNC
+from solo.trainer.rules import start_solo_game, Client, GameSettings
 
 
 def init_weights():
