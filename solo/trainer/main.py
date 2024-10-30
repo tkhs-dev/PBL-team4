@@ -74,6 +74,8 @@ def evaluate(individual):
     results = pool.map(evaluate_single, [individual] * 5)
     return sum(results) / len(results),
 
+path = None
+
 def train():
     creator.create("FitnessMin", base.Fitness, weights=(1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMin)
@@ -92,6 +94,7 @@ def train():
         ind.fitness.values = fit
     print("  Evaluated %i individuals" % len(population))
 
+    last_best = 0
     for g in range(NGEN):
         print("-- Generation %i --" % g)
         offspring = toolbox.select(population, len(population))
@@ -115,6 +118,12 @@ def train():
         mean = sum(fits) / length
         sum2 = sum(x*x for x in fits)
         std = abs(sum2 / length - mean**2)**0.5
+        if last_best < max(fits):
+            last_best = max(fits)
+            best_ind = tools.selBest(population, 1)[0]
+            model = individual_to_model(best_ind)
+            model.save(path+"evaluator-%d_%d.pth" % (g, last_best))
+
         print("  Min %s" % min(fits))
         print("  Max %s" % max(fits))
         print("  Avg %s" % mean)
@@ -127,4 +136,9 @@ def train():
     model.save("../evaluator.pth")
 
 if __name__ == "__main__":
+    if not os.path.exists("../pth/"):
+        os.makedirs("../pth/")
+    os.mkdir("../pth/"+str(int(time.time())))
+    path = "../pth/"+str(int(time.time()))+"/"
+    pool = Pool(4)
     train()
