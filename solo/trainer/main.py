@@ -16,7 +16,9 @@ from solo.trainer.rules import start_solo_game, Client, GameSettings
 
 def init_weights():
     model = EvaluatorModel()
-    # 個体のリストに重みを格納
+    return get_weights(model)
+
+def get_weights(model):
     weights = []
     for param in model.parameters():
         weights.extend(param.data.numpy().flatten())
@@ -76,7 +78,7 @@ def evaluate(individual):
 
 path = None
 
-def train():
+def train(init_weights = init_weights):
     creator.create("FitnessMin", base.Fitness, weights=(1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMin)
     toolbox = base.Toolbox()
@@ -141,4 +143,8 @@ if __name__ == "__main__":
     os.mkdir("../pth/"+str(int(time.time())))
     path = "../pth/"+str(int(time.time()))+"/"
     pool = Pool(4)
-    train()
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
+        train(init_weights=lambda: get_weights(Evaluator.load(path=path).model))
+    else:
+        train()
