@@ -33,7 +33,7 @@ class AIPlayer(IPlayer):
         print("GAME OVER\n")
 
     def on_move(self, game_state):
-        safe_moves = list(filter(
+        survival_moves = list(filter(
             lambda x: x[1][0] is TurnResult.CONTINUE,
             map(
                 lambda x:  (x,rule.move(game_state, x)),
@@ -47,9 +47,11 @@ class AIPlayer(IPlayer):
                     Direction
                 )
             ),
-            safe_moves
+            survival_moves
         ))
 
+        if len(safe_moves) == 0:
+            safe_moves = survival_moves
         if len(safe_moves) == 0:
             return Direction.UP
         ev = list(map(
