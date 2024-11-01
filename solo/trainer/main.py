@@ -144,7 +144,7 @@ if __name__ == "__main__":
     path = "../pth/"+str(int(time.time()))+"/"
     pool = Pool(4)
     if len(sys.argv) > 1:
-        path = sys.argv[1]
-        train(init_weights=lambda: get_weights(Evaluator.load(path=path).model))
+        parent_path = sys.argv[1]
+        train(init_weights=lambda: get_weights(Evaluator.load(path=parent_path).model))
     else:
         train()
