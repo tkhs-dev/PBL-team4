@@ -62,11 +62,14 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         #TODO
         next_state["you"]["health"] = 100
         next_state["you"]["length"] += 1
-        next_state["you"]["head"] = next_head
+        next_state["you"]["head"] = next_head ##蛇の頭を更新
         pass
     else:
         #何も接触しなかった場合の処理
         #TODO
+        next_state["you"]["health"] -= 1
+        next_state["you"]["head"] = next_head #蛇の頭を更新
+        next_state["you"]["body"].pop   #長さは変化しない、蛇が前に進む
         pass
 
     return TurnResult.CONTINUE, next_state
