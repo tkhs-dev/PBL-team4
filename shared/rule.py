@@ -60,6 +60,9 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     if _is_head_colliding_with_food(game_state, next_head):
         #餌に接触した場合の処理
         #TODO
+        next_state["you"]["health"] = 100
+        next_state["you"]["length"] += 1
+        next_state["you"]["head"] = next_head
         pass
     else:
         #何も接触しなかった場合の処理
