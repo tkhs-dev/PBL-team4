@@ -72,5 +72,7 @@ def _is_head_colliding_with_other_snake(game_state:dict, next_head:(int,int)) ->
     return None
 
 def _is_head_colliding_with_food(game_state:dict, next_head:(int,int)) -> bool:
-    #TODO
+    for food in game_state["board"]["food"]:
+        if next_head["x"] == food["x"] and next_head["y"] == food["y"]:
+               return True
     return False
