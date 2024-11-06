@@ -47,13 +47,13 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         #TODO
         if next_head in snake["head"]:
               if game_state["you"]["length"] > game_state["snake"]["length"]:
-                      return TurnResult.WIN
+                      return TurnResult.WIN,None
               elif game_state["you"]["length"] == game_state["snake"]["length"]:
-                      return TurnResult.DRAW
+                      return TurnResult.DRAW,None
               elif game_state["you"]["length"] < game_state["snake"]["length"]:
-                      return TurnResult.LOSE
+                      return TurnResult.LOSE,None
         elif next_head in snake["body"]:
-              return TurnResult.LOSE
+              return TurnResult.LOSE,None
         pass
 
 
