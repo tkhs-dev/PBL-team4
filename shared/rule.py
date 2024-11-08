@@ -35,6 +35,8 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     next_head["x"] += direction.get_direction_pair()[0]
     next_head["y"] += direction.get_direction_pair()[1]
 
+    next_state["turn"] += 1
+
     #何らかの衝突があるかどうかを判定し,それに応じて処理、結果を返す
     if _is_head_out_of_bounds(game_state, next_head):
         return TurnResult.LOSE, None
@@ -61,12 +63,15 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         next_state["you"]["length"] += 1
         next_state["you"]["head"] = next_head ##蛇の頭を更新
         next_state["you"]["body"].insert(0, next_head) #蛇の頭を更新
+        next_state["board"]["food"].remove(next_head)
     else:
         #何も接触しなかった場合の処理
         next_state["you"]["health"] -= 1
         next_state["you"]["head"] = next_head #蛇の頭を更新
         next_state["you"]["body"].pop()   #長さは変化しない、蛇が前に進む
         next_state["you"]["body"].insert(0, next_head) #蛇の頭を更新
+        if next_state["you"]["health"] == 0:
+            return TurnResult.LOSE, None
 
     return TurnResult.CONTINUE, next_state
 
