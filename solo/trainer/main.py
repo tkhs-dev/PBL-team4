@@ -12,6 +12,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from solo.sneak.evaluator import EvaluatorModel, Evaluator
 from solo.sneak.player import AIPlayer
 from solo.trainer.rules import start_solo_game, Client, GameSettings
+from shared import rule
+from shared.rule import Direction
 
 
 def init_weights():
@@ -35,7 +37,20 @@ def individual_to_model(individual):
         start += param_size
     return model
 
+score = 0
+def move_callback(game_state, player)->Direction:
+    move = player.on_move(game_state)
+    next_state = rule.move(game_state, Direction.UP)[1]
+    if next_state is None:
+        return move
+    global score
+    if next_state["you"]["health"] == 100 and game_state["you"]["health"] == 1:
+        score += 50 * next_state["you"]["length"]
+    return move
+
 def evaluate_single(individual):
+    global score
+    score = 0
     model = EvaluatorModel()
     # 重みをモデルにセット
     start = 0
@@ -53,7 +68,7 @@ def evaluate_single(individual):
     # ゲーム開始
     player = AIPlayer(evaluator)
     client = Client()
-    client.on_move = lambda state: player.on_move(state)
+    client.on_move = lambda state: move_callback(state, player)
 
     setting = GameSettings()
     setting.seed = random.randint(0, 100000)
@@ -63,11 +78,7 @@ def evaluate_single(individual):
     setting.minimum_food = 3
 
     result = start_solo_game(client, setting)
-    score = result["turn"]
-    if result["you"]["health"] <= 0:
-        score /= 2
-    if -10<=(result["turn"]+200) - result["you"]["length"]*100 < 0 and result["you"]["length"] > 5:
-        score *= 2
+    score += result["turn"]
     return score
 
 pool = None
@@ -89,7 +100,7 @@ def train(init_weights = init_weights):
     toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
     toolbox.register("select", tools.selTournament, tournsize=3)
     population = toolbox.population(n=10)
-    CXPB, MUTPB, NGEN = 0.5, 0.2, 100
+    CXPB, MUTPB, NGEN = 0.5, 0.2, 50
     print("Start of evolution")
     fitnesses = list(map(toolbox.evaluate, population))
     for ind, fit in zip(population, fitnesses):
