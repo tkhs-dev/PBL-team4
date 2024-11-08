@@ -44,8 +44,9 @@ def move_callback(game_state, player)->Direction:
     if next_state is None:
         return move
     global score
+    # ==必要に応じてターンごとにスコアを加算する==
     if next_state["you"]["health"] == 100 and game_state["you"]["health"] == 1:
-        score += 50 * next_state["you"]["length"]
+        score += 50 * next_state["you"]["length"] # エサを体力1で食べた場合に長さx50のスコアを加算(ぎりぎりでエサを食べてほしいから)
     return move
 
 def evaluate_single(individual):
@@ -72,19 +73,25 @@ def evaluate_single(individual):
 
     setting = GameSettings()
     setting.seed = random.randint(0, 100000)
+    # 盤面を狭めて学習させてみるのも良いかもしれない
     setting.width = 6
     setting.height = 6
     setting.food_spawn_chance = 0
     setting.minimum_food = 3
 
     result = start_solo_game(client, setting)
-    score += result["turn"]
+
+    # 以下で最終結果に応じてスコアの加算を行う
+    score += result["turn"] # ターン数をスコアに加算
     return score
 
 pool = None
 
 def evaluate(individual):
-    results = pool.map(evaluate_single, [individual] * 5)
+    # 1つの個体に対してN回評価を行い、その平均値を返す.大きくすると学習が安定するが時間がかかる.
+    N = 15
+
+    results = pool.map(evaluate_single, [individual] * N)
     return sum(results) / len(results),
 
 path = None
@@ -96,11 +103,16 @@ def train(init_weights = init_weights):
     toolbox.register("individual", tools.initIterate, creator.Individual, init_weights)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", evaluate)
+    # 以下の３種類(交叉,突然変異,選択)のメソッドを変更してみると学習がうまくいくかも(@see https://deap.readthedocs.io/en/master/api/tools.html)
+    # 学習の進行度合いに応じてメソッドを変更すると学習を適切に進められるらしい(by ChatGPT)
     toolbox.register("mate", tools.cxBlend, alpha=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
     toolbox.register("select", tools.selTournament, tournsize=3)
+
+    # １つの世代の個体数 50ぐらいが良い？ 学習にかかる時間に関わるので小さすぎると悪い
     population = toolbox.population(n=10)
-    CXPB, MUTPB, NGEN = 0.5, 0.2, 50
+
+    CXPB, MUTPB, NGEN = 0.5, 0.2, 50 # 交叉、突然変異、世代数 (CXとMUTは上で設定した値と同じにしておくべき,世代数は50ぐらい？ population x generationが1500~3000程度が良いらしい by ChatGPT)
     print("Start of evolution")
     fitnesses = list(map(toolbox.evaluate, population))
     for ind, fit in zip(population, fitnesses):
