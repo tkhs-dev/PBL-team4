@@ -45,16 +45,31 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         #もし接触したのが他の蛇の頭の場合,蛇の長さに応じて勝敗が変わる
         #体に接触した場合はこちらの負け
         #TODO
+        if next_head in snake["head"]:
+              if game_state["you"]["length"] > game_state["snake"]["length"]:
+                      return TurnResult.WIN,None
+              elif game_state["you"]["length"] == game_state["snake"]["length"]:
+                      return TurnResult.DRAW,None
+              elif game_state["you"]["length"] < game_state["snake"]["length"]:
+                      return TurnResult.LOSE,None
+        elif next_head in snake["body"]:
+              return TurnResult.LOSE,None
         pass
 
 
     if _is_head_colliding_with_food(game_state, next_head):
         #餌に接触した場合の処理
         #TODO
+        next_state["you"]["health"] = 100
+        next_state["you"]["length"] += 1
+        next_state["you"]["head"] = next_head ##蛇の頭を更新
         pass
     else:
         #何も接触しなかった場合の処理
         #TODO
+        next_state["you"]["health"] -= 1
+        next_state["you"]["head"] = next_head #蛇の頭を更新
+        next_state["you"]["body"].pop   #長さは変化しない、蛇が前に進む
         pass
 
     return TurnResult.CONTINUE, next_state
@@ -72,5 +87,7 @@ def _is_head_colliding_with_other_snake(game_state:dict, next_head:(int,int)) ->
     return None
 
 def _is_head_colliding_with_food(game_state:dict, next_head:(int,int)) -> bool:
-    #TODO
+    for food in game_state["board"]["food"]:
+        if next_head["x"] == food["x"] and next_head["y"] == food["y"]:
+               return True
     return False
