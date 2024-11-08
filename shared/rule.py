@@ -44,7 +44,7 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         #snakeには衝突したsnakeのdictが入る
         #もし接触したのが他の蛇の頭の場合,蛇の長さに応じて勝敗が変わる
         #体に接触した場合はこちらの負け
-        if next_head in snake["head"]:
+        if next_head == snake["head"]:
               if game_state["you"]["length"] > game_state["snake"]["length"]:
                       return TurnResult.WIN,None
               elif game_state["you"]["length"] == game_state["snake"]["length"]:
