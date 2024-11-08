@@ -2,6 +2,8 @@
 # example:
 #  def get_snake_length(game_state: dict) -> int:
 #      return game_state["you"]["length"]
+import copy
+
 
 def get_front_body(game_state: dict) -> int:
     r = 0
@@ -135,15 +137,63 @@ def get_rightd_body(game_state: dict) -> int:
 
 #餌との最短距離
 def get_snake_foods(game_state: dict) -> int:
-    food_min=game_state["board"]["width"]+game_state["board"]["height"]
-    my_head=game_state["you"]["head"]
+    distance = game_state["board"]["width"] + game_state["board"]["height"]
+    head = game_state["you"]["head"]
+    flg = False
+    for food in game_state["board"]["food"]:
+        body = copy.deepcopy(game_state["you"]["body"])
+        dx = food["x"] - head["x"]
+        dy = food["y"] - head["y"]
+        for x in range(0, dx-1, (1 > dx-1)*-2+1):
+            if { "x": head["x"] + x, "y": head["y"] } == head:
+                continue
+            if len(body) == 1:
+                break
+            body.pop()
+            if { "x": head["x"] + x, "y": head["y"] } in body:
+                flg = True
+                break
+        if not flg:
+            for y in range(0, dy-1, (1 > dy-1)*-2+1):
+                if { "x": head["x"] + dx, "y": head["y"] + y } == head:
+                    continue
+                if len(body) == 1:
+                    break
+                body.pop()
+                if { "x": head["x"] + dx, "y": head["y"] + y } in body:
+                    flg = True
+                    break
+        body = copy.deepcopy(game_state["you"]["body"])
+        if not flg:
+            distance = min(distance, abs(dx) + abs(dy))
+        else:
+            flg = False
+            for y in range(0, dy-1, (1 > dy-1)*-2+1):
+                if { "x": head["x"], "y": head["y"] + y } == head:
+                    continue
+                if len(body) == 1:
+                    break
+                body.pop()
+                if { "x": head["x"], "y": head["y"] + y } in body:
+                    flg = True
+                    break
+            if not flg:
+                for x in range(0, dx-1, (1 > dx-1)*-2+1):
+                    if { "x": head["x"] + x, "y": head["y"] + dy } == head:
+                        continue
+                    if len(body) == 1:
+                        break
+                    body.pop()
+                    if { "x": head["x"] + x, "y": head["y"] +dy } in body:
+                        flg = True
+                        break
+            if not flg:
+                distance = min(distance, abs(dx) + abs(dy))
 
-    for feed in game_state["board"]["food"]:
-        food=abs(my_head["x"]-feed["x"])+abs(my_head["y"]-feed["y"])
-        if food_min >=  food:
-            food_min=food
-    
-    return food_min
+    return distance
+
+
+
 
 #壁との距離
 def get_snake_distance(game_state: dict) -> int:
