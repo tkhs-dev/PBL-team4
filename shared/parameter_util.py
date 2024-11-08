@@ -135,7 +135,7 @@ def get_rightd_body(game_state: dict) -> int:
 
 #餌との最短距離
 def get_snake_foods(game_state: dict) -> int:
-    food_min=36
+    food_min=game_state["board"]["width"]+game_state["board"]["height"]
     my_head=game_state["you"]["head"]
 
     for feed in game_state["board"]["food"]:
@@ -149,8 +149,8 @@ def get_snake_foods(game_state: dict) -> int:
 def get_snake_distance(game_state: dict) -> int:
     coordinate_x = game_state["you"]["head"]["x"]
     coordinate_y = game_state["you"]["head"]["y"]
-    x_distance = 7 - coordinate_x
-    y_distance = 7 - coordinate_y
+    x_distance = game_state["board"]["width"] + 1 - coordinate_x
+    y_distance = game_state["board"]["height"] + 1 - coordinate_y
     min_distance = min(coordinate_x, coordinate_y, x_distance, y_distance)
     return min_distance
 
