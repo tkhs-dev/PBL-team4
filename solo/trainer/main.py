@@ -45,7 +45,7 @@ def move_callback(game_state, player)->Direction:
         return move
     global score
     # ==必要に応じてターンごとにスコアを加算する==
-    if next_state["you"]["health"] == 100 and game_state["you"]["health"] == 1:
+    if next_state["you"]["health"] == 100 and game_state["you"]["health"] == 1 and 0 <= game_state["turn"] / 100 + 4 - game_state["you"]["length"] <= 2:
         score += 50 * next_state["you"]["length"] # エサを体力1で食べた場合に長さx50のスコアを加算(ぎりぎりでエサを食べてほしいから)
     return move
 
