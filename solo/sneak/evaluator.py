@@ -28,15 +28,15 @@ class Evaluator:
     def get_input_tensor(game_state : dict):
         return torch.Tensor(
             [
-                get_front_body(game_state),
-                get_left_body(game_state),
-                get_right_body(game_state),
-                get_leftd_body(game_state),
-                get_rightd_body(game_state),
-                get_snake_length(game_state),
-                get_snake_health(game_state),
-                get_snake_distance(game_state),
-                get_snake_foods(game_state)
+                get_front_body(game_state)/3,
+                get_left_body(game_state)/3,
+                get_right_body(game_state)/3,
+                get_leftd_body(game_state)/3,
+                get_rightd_body(game_state)/3,
+                get_snake_length(game_state)/(game_state["board"]["width"]*game_state["board"]["height"]),
+                get_snake_health(game_state)/100,
+                get_snake_distance(game_state)/(game_state["board"]["height"]),
+                get_snake_foods(game_state)/(game_state["board"]["height"]+game_state["board"]["width"])
             ]
         )
 
@@ -45,8 +45,6 @@ class EvaluatorModel(nn.Module):
         super(EvaluatorModel, self).__init__()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(9, 20),
-            nn.ReLU(),
-            nn.Linear(20, 20),
             nn.ReLU(),
             nn.Linear(20, 1),
         )
