@@ -217,3 +217,24 @@ def get_snake_health(game_state: dict) -> int:
     health = game_state["you"]["health"]
 
     return health
+
+def get_free_space(game_state: dict) -> int:
+    free_space = 0
+    head = game_state["you"]["head"]
+    front = {"x": head["x"], "y": head["y"] - 1}
+    right = {"x": head["x"] + 1, "y": head["y"]}
+    left = {"x": head["x"] - 1, "y": head["y"]}
+    back = {"x": head["x"], "y": head["y"] + 1}
+    if front["y"] >= 0 and front not in game_state["you"]["body"] and front not in game_state["board"]["food"]:
+        free_space += 1
+
+    if right["x"] < game_state["board"]["width"] and right not in game_state["you"]["body"] and right not in game_state["board"]["food"]:
+        free_space += 1
+
+    if left["x"] >= 0 and left not in game_state["you"]["body"] and left not in game_state["board"]["food"]:
+        free_space += 1
+
+    if back["y"] < game_state["board"]["height"] and back not in game_state["you"]["body"] and back not in game_state["board"]["food"]:
+        free_space += 1
+
+    return free_space

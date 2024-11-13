@@ -7,7 +7,7 @@ from torch import nn
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from shared.parameter_util import get_front_body, get_left_body, get_right_body, get_leftd_body, get_rightd_body, \
-    get_snake_length, get_snake_health, get_snake_distance, get_snake_foods
+    get_snake_length, get_snake_health, get_snake_distance, get_snake_foods, get_free_space
 
 
 class Evaluator:
@@ -36,7 +36,8 @@ class Evaluator:
                 get_snake_length(game_state)/(game_state["board"]["width"]*game_state["board"]["height"]),
                 get_snake_health(game_state)/100,
                 get_snake_distance(game_state)/(game_state["board"]["height"]),
-                get_snake_foods(game_state)/(game_state["board"]["height"]+game_state["board"]["width"])
+                get_snake_foods(game_state)/(game_state["board"]["height"]+game_state["board"]["width"]),
+                get_free_space(game_state)/3
             ]
         )
 
@@ -44,7 +45,7 @@ class EvaluatorModel(nn.Module):
     def __init__(self):
         super(EvaluatorModel, self).__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(9, 20),
+            nn.Linear(10, 20),
             nn.ReLU(),
             nn.Linear(20, 1),
         )
