@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 import random
 import sys
@@ -49,7 +50,8 @@ def move_callback(game_state, player)->Direction:
         score += 50 * next_state["you"]["length"] # エサを体力1で食べた場合に長さx50のスコアを加算(ぎりぎりでエサを食べてほしいから)
     return move
 
-def evaluate_single(individual):
+def evaluate_single(individual_seed):
+    individual, seed = individual_seed
     global score
     score = 0
     model = EvaluatorModel()
@@ -72,7 +74,7 @@ def evaluate_single(individual):
     client.on_move = lambda state: move_callback(state, player)
 
     setting = GameSettings()
-    setting.seed = random.randint(0, 100000)
+    setting.seed = seed
     # 盤面を狭めて学習させてみるのも良いかもしれない
     setting.width = 6
     setting.height = 6
@@ -87,12 +89,10 @@ def evaluate_single(individual):
 
 pool = None
 
-def evaluate(individual):
-    # 1つの個体に対してN回評価を行い、その平均値を返す.大きくすると学習が安定するが時間がかかる.
-    N = 15
-
-    results = pool.map(evaluate_single, [individual] * N)
-    return sum(results) / len(results),
+def evaluate(individual_seed_set):
+    individual, seed_set = individual_seed_set
+    results = map(evaluate_single, [(individual, seed) for seed in seed_set])
+    return min(results),
 
 path = None
 
@@ -105,22 +105,26 @@ def train(init_weights = init_weights):
     toolbox.register("evaluate", evaluate)
     # 以下の３種類(交叉,突然変異,選択)のメソッドを変更してみると学習がうまくいくかも(@see https://deap.readthedocs.io/en/master/api/tools.html)
     # 学習の進行度合いに応じてメソッドを変更すると学習を適切に進められるらしい(by ChatGPT)
-    toolbox.register("mate", tools.cxBlend, alpha=0.5)
+    toolbox.register("mate", tools.cxUniform, indpb=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
     toolbox.register("select", tools.selTournament, tournsize=3)
+    toolbox.register("map", pool.map)
 
     # １つの世代の個体数 50ぐらいが良い？ 学習にかかる時間に関わるので小さすぎると悪い
-    population = toolbox.population(n=10)
+    population = toolbox.population(n=100)
 
-    CXPB, MUTPB, NGEN = 0.5, 0.2, 50 # 交叉、突然変異、世代数 (CXとMUTは上で設定した値と同じにしておくべき,世代数は50ぐらい？ population x generationが1500~3000程度が良いらしい by ChatGPT)
+    CXPB, MUTPB, NGEN = 0.8, 0.2, 50 # 交叉、突然変異、世代数 (CXとMUTは上で設定した値と同じにしておくべき,世代数は50ぐらい？ population x generationが1500~3000程度が良いらしい by ChatGPT)
+    N = 1 # 1世代あたりの評価回数
     print("Start of evolution")
-    fitnesses = list(map(toolbox.evaluate, population))
+    seed_set = random.sample(range(100000), N)
+    fitnesses = list(pool.map(toolbox.evaluate, [(ind, seed_set) for ind in population]))
     for ind, fit in zip(population, fitnesses):
         ind.fitness.values = fit
     print("  Evaluated %i individuals" % len(population))
 
     last_best = 0
     for g in range(NGEN):
+        seed_set = random.sample(range(100000), N)
         print("-- Generation %i --" % g)
         offspring = toolbox.select(population, len(population))
         offspring = list(map(toolbox.clone, offspring))
@@ -133,8 +137,8 @@ def train(init_weights = init_weights):
             if random.random() < MUTPB:
                 toolbox.mutate(mutant)
                 del mutant.fitness.values
-        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        fitnesses = map(toolbox.evaluate, invalid_ind)
+        invalid_ind = [ind for ind in offspring if not False]
+        fitnesses = pool.map(toolbox.evaluate, [(ind, seed_set) for ind in invalid_ind])
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
         population[:] = offspring
@@ -143,11 +147,13 @@ def train(init_weights = init_weights):
         mean = sum(fits) / length
         sum2 = sum(x*x for x in fits)
         std = abs(sum2 / length - mean**2)**0.5
+
+        best_ind = tools.selBest(population, 1)[0]
+        model = individual_to_model(best_ind)
         if last_best < max(fits):
             last_best = max(fits)
-            best_ind = tools.selBest(population, 1)[0]
-            model = individual_to_model(best_ind)
             model.save(path+"evaluator-%d_%d.pth" % (g, last_best))
+        model.save("../evaluator.pth")
 
         print("  Min %s" % min(fits))
         print("  Max %s" % max(fits))
@@ -165,7 +171,7 @@ if __name__ == "__main__":
         os.makedirs("../pth/")
     os.mkdir("../pth/"+str(int(time.time())))
     path = "../pth/"+str(int(time.time()))+"/"
-    pool = Pool(4)
+    pool = Pool(multiprocessing.cpu_count())
     if len(sys.argv) > 1:
         parent_path = sys.argv[1]
         train(init_weights=lambda: get_weights(Evaluator.load(path=parent_path).model))
