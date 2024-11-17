@@ -21,6 +21,12 @@ def init_weights():
     model = EvaluatorModel()
     return get_weights(model)
 
+def load_model_or_randomized_weights(model, randomize_pb=0.5):
+    if random.random() < randomize_pb:
+        return init_weights()
+    else:
+        return get_weights(model)
+
 def get_weights(model):
     weights = []
     for param in model.parameters():
@@ -39,15 +45,25 @@ def individual_to_model(individual):
     return model
 
 score = 0
+min_val = 0
 def move_callback(game_state, player)->Direction:
     move = player.on_move(game_state)
     next_state = rule.move(game_state, Direction.UP)[1]
     if next_state is None:
         return move
     global score
+    global min_val
+
+    scale = 2 if (-2 <= (next_state["turn"] + 300 - next_state["you"]["length"] * 100) / 100 <= 1) else 1
     # ==必要に応じてターンごとにスコアを加算する==
-    if next_state["you"]["health"] == 100 and game_state["you"]["health"] == 1 and 0 <= game_state["turn"] / 100 + 4 - game_state["you"]["length"] <= 2:
-        score += 50 * next_state["you"]["length"] # エサを体力1で食べた場合に長さx50のスコアを加算(ぎりぎりでエサを食べてほしいから)
+    if (next_state["you"]["health"] == 100):
+        score += (100 - game_state["you"]["health"])
+        if game_state["you"]["health"] <= 2:
+            score += (100 - game_state["you"]["health"])
+    # elif next_state["you"]["health"] == 100 and game_state["you"]["health"] > 80 and next_state["you"]["length"] < 5:
+    #     score -= game_state["you"]["health"] * 10
+    if min_val != 0 and  score > min_val:
+        return Direction.SURRENDER
     return move
 
 def evaluate_single(individual_seed):
@@ -84,12 +100,19 @@ def evaluate_single(individual_seed):
     result = start_solo_game(client, setting)
 
     # 以下で最終結果に応じてスコアの加算を行う
-    score += result["turn"] # ターン数をスコアに加算
-    return score
+    #score += result["turn"] # ターン数をスコアに加算
+    score += result["turn"] # ターン数をスコアに加算(最大200ターンまで)
+    if result["turn"] < 1000 and result["you"]["health"] == 0:
+        return 0
+    global min_val
+    if min_val == 0 or score < min_val:
+        min_val = score
+    return max(score, 1)
 
 pool = None
-
 def evaluate(individual_seed_set):
+    global min_val
+    min_val = 0
     individual, seed_set = individual_seed_set
     results = map(evaluate_single, [(individual, seed) for seed in seed_set])
     return min(results),
@@ -105,16 +128,16 @@ def train(init_weights = init_weights):
     toolbox.register("evaluate", evaluate)
     # 以下の３種類(交叉,突然変異,選択)のメソッドを変更してみると学習がうまくいくかも(@see https://deap.readthedocs.io/en/master/api/tools.html)
     # 学習の進行度合いに応じてメソッドを変更すると学習を適切に進められるらしい(by ChatGPT)
-    toolbox.register("mate", tools.cxUniform, indpb=0.5)
-    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
-    toolbox.register("select", tools.selTournament, tournsize=3)
+    toolbox.register("mate", tools.cxUniform, indpb=0.2)
+    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.2)
+    toolbox.register("select", tools.selRoulette)
     toolbox.register("map", pool.map)
 
     # １つの世代の個体数 50ぐらいが良い？ 学習にかかる時間に関わるので小さすぎると悪い
     population = toolbox.population(n=100)
 
-    CXPB, MUTPB, NGEN = 0.8, 0.2, 50 # 交叉、突然変異、世代数 (CXとMUTは上で設定した値と同じにしておくべき,世代数は50ぐらい？ population x generationが1500~3000程度が良いらしい by ChatGPT)
-    N = 1 # 1世代あたりの評価回数
+    CXPB, MUTPB, NGEN = 0.7, 0.1, 1000 # 交叉、突然変異、世代数 (CXとMUTは上で設定した値と同じにしておくべき,世代数は50ぐらい？ population x generationが1500~3000程度が良いらしい by ChatGPT)
+    N = 4 # 1世代あたりの評価回数
     print("Start of evolution")
     seed_set = random.sample(range(100000), N)
     fitnesses = list(pool.map(toolbox.evaluate, [(ind, seed_set) for ind in population]))
@@ -174,6 +197,6 @@ if __name__ == "__main__":
     pool = Pool(multiprocessing.cpu_count())
     if len(sys.argv) > 1:
         parent_path = sys.argv[1]
-        train(init_weights=lambda: get_weights(Evaluator.load(path=parent_path).model))
+        train(init_weights=lambda: load_model_or_randomized_weights(Evaluator.load(path=parent_path).model, randomize_pb=0.2))
     else:
         train()

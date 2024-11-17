@@ -13,6 +13,7 @@ class Direction(Enum):
     DOWN = "down"
     LEFT = "left"
     RIGHT = "right"
+    SURRENDER = "surrender"
 
     def get_direction_pair(self) -> (int,int):
         if self == Direction.UP:

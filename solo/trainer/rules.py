@@ -35,6 +35,8 @@ class Client:
             return 2
         elif direction == Direction.RIGHT:
             return 3
+        elif direction == Direction.SURRENDER:
+            return 4
         else :
             return 0
 

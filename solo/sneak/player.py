@@ -37,14 +37,14 @@ class AIPlayer(IPlayer):
             lambda x: x[1][0] is TurnResult.CONTINUE,
             map(
                 lambda x:  (x,rule.move(game_state, x)),
-                Direction
+                filter(lambda x:x!=Direction.SURRENDER,Direction)
             )
         ))
         safe_moves = list(filter(
             lambda x: any(
                 map(
                     lambda y: rule.move(x[1][1], y)[0] is TurnResult.CONTINUE,
-                    Direction
+                    filter(lambda x:x!=Direction.SURRENDER,Direction)
                 )
             ),
             survival_moves
@@ -55,7 +55,7 @@ class AIPlayer(IPlayer):
         if len(safe_moves) == 0:
             return Direction.UP
         ev = list(map(
-            lambda x: (x[0], self.evaluator.evaluate(x[1][1])),
+            lambda x: (x[0], self.evaluator.evaluate(x[1][1], game_state)),
             safe_moves
         ))
         # print(ev)

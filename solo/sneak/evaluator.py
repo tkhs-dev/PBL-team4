@@ -21,23 +21,24 @@ class Evaluator:
         evaluator.model.load(path)
         return evaluator
 
-    def evaluate(self, game_state) -> float:
-        return self.model(self.get_input_tensor(game_state)).item()
+    def evaluate(self, next_game_state, prev_game_state) -> float:
+        return self.model(self.get_input_tensor(next_game_state,prev_game_state)).item()
 
     @staticmethod
-    def get_input_tensor(game_state : dict):
+    def get_input_tensor(next_game_state : dict, prev_game_state : dict) -> torch.Tensor:
         return torch.Tensor(
             [
-                get_front_body(game_state)/3,
-                get_left_body(game_state)/3,
-                get_right_body(game_state)/3,
-                get_leftd_body(game_state)/3,
-                get_rightd_body(game_state)/3,
-                get_snake_length(game_state)/(game_state["board"]["width"]*game_state["board"]["height"]),
-                get_snake_health(game_state)/100,
-                get_snake_distance(game_state)/(game_state["board"]["height"]),
-                get_snake_foods(game_state)/(game_state["board"]["height"]+game_state["board"]["width"]),
-                get_free_space(game_state)/3
+                get_front_body(next_game_state) / 3,
+                get_left_body(next_game_state) / 3,
+                get_right_body(next_game_state) / 3,
+                get_leftd_body(next_game_state) / 3,
+                get_rightd_body(next_game_state) / 3,
+                get_snake_length(next_game_state) / (next_game_state["board"]["width"] * next_game_state["board"]["height"]),
+                get_snake_health(next_game_state) / 100,
+                get_snake_health(prev_game_state) / 100,
+                get_snake_distance(next_game_state) / (next_game_state["board"]["height"]),
+                get_snake_foods(next_game_state) / (next_game_state["board"]["height"] + next_game_state["board"]["width"]),
+                get_free_space(next_game_state) / 3
             ]
         )
 
@@ -45,9 +46,9 @@ class EvaluatorModel(nn.Module):
     def __init__(self):
         super(EvaluatorModel, self).__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(10, 20),
+            nn.Linear(11, 25),
             nn.ReLU(),
-            nn.Linear(20, 1),
+            nn.Linear(25, 1),
         )
         return
 
