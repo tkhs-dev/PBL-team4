@@ -1,3 +1,13 @@
+#04
+#python 3.12.7
+#
+#--dependencies--
+#Flask==2.3.2
+#requests
+#torch
+#deap
+#numpy
+
 import sys
 import typing
 
@@ -13,7 +23,7 @@ def info() -> typing.Dict:
     return {
         "apiversion": "1",
         "author": "",  # TODO: Your Battlesnake Username
-        "color": "#888888",  # TODO: Choose color
+        "color": "#ff0000",  # TODO: Choose color
         "head": "default",  # TODO: Choose head
         "tail": "default",  # TODO: Choose tail
     }
@@ -25,6 +35,6 @@ if __name__ == "__main__":
         path = sys.argv[1]
         evaluator = Evaluator.load(path)
     else:
-        evaluator = Evaluator()
+        evaluator = Evaluator.load("./evaluator.pth")
     player = AIPlayer(evaluator)
     run_server({"info": info, "start": player.on_start, "move": lambda game_state: {"move":player.on_move(game_state).value}, "end": player.on_end})
