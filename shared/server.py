@@ -12,7 +12,13 @@ def run_server(handlers: typing.Dict):
 
     @app.get("/")
     def on_info():
-        return handlers["info"]()
+        return {
+            "apiversion": "1",
+            "author": "",  # TODO: Your Battlesnake Username
+            "color": "#ff0000",  # TODO: Choose color
+            "head": "default",  # TODO: Choose head
+            "tail": "default",  # TODO: Choose tail
+        }
 
     @app.post("/start")
     def on_start():

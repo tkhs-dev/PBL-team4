@@ -1,26 +1,11 @@
-import abc
 import os
 import sys
-from abc import ABCMeta
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from solo.sneak.evaluator import Evaluator
 from shared import rule
 from shared.rule import TurnResult, Direction
-
-
-class IPlayer(metaclass=ABCMeta):
-    @abc.abstractmethod
-    def on_start(self, game_state):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def on_end(self, game_state):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def on_move(self, game_state) -> Direction:
-        raise NotImplementedError
+from shared.player import IPlayer
 
 class AIPlayer(IPlayer):
     def __init__(self, evaluator:Evaluator):
