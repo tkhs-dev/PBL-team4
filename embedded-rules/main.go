@@ -228,13 +228,11 @@ func (gameState *GameState) createNextBoard(boardState *rules.BoardState) (bool,
 	if err != nil {
 		return false, nil, err
 	}
-	var surrender bool
 	var moves []rules.SnakeMove
 	for _, snakeState := range gameState.snakeStates {
 		for _, snake := range boardState.Snakes {
 			if snake.ID == snakeState.ID && snake.EliminatedCause == rules.NotEliminated {
-				nextState, sur := gameState.getSnakeUpdate(boardState, snakeState)
-				surrender = sur
+				nextState := gameState.getSnakeUpdate(boardState, snakeState)
 				gameState.snakeStates[snakeState.ID] = nextState
 				moves = append(moves, rules.SnakeMove{ID: snakeState.ID, Move: nextState.LastMove})
 			}
@@ -251,10 +249,10 @@ func (gameState *GameState) createNextBoard(boardState *rules.BoardState) (bool,
 		return false, nil, err
 	}
 	boardState.Turn++
-	return gameOver || surrender, boardState, nil
+	return gameOver, boardState, nil
 }
 
-func (gameState *GameState) getSnakeUpdate(boardState *rules.BoardState, snakeState SnakeState) (SnakeState, bool) {
+func (gameState *GameState) getSnakeUpdate(boardState *rules.BoardState, snakeState SnakeState) SnakeState {
 	snakeReq := gameState.getRequestBodyForSnake(boardState, snakeState)
 	reqBody := serialiseSnakeRequest(snakeReq)
 	resBody := snakeState.Client.callOnMove(string(reqBody))
@@ -270,10 +268,7 @@ func (gameState *GameState) getSnakeUpdate(boardState *rules.BoardState, snakeSt
 	default:
 		snakeState.LastMove = "up"
 	}
-	if resBody == 4 {
-		return snakeState, true
-	}
-	return snakeState, false
+	return snakeState
 }
 
 func serialiseSnakeRequest(snakeRequest client.SnakeRequest) []byte {

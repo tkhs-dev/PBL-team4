@@ -22,14 +22,14 @@ class AIPlayer(IPlayer):
             lambda x: x[1][0] is TurnResult.CONTINUE,
             map(
                 lambda x:  (x,rule.move(game_state, x)),
-                filter(lambda x:x!=Direction.SURRENDER,Direction)
+                Direction
             )
         ))
         safe_moves = list(filter(
             lambda x: any(
                 map(
                     lambda y: rule.move(x[1][1], y)[0] is TurnResult.CONTINUE,
-                    filter(lambda x:x!=Direction.SURRENDER,Direction)
+                    Direction
                 )
             ),
             survival_moves
