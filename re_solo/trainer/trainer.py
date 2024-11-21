@@ -1,5 +1,6 @@
 import os
 import random
+import signal
 import sys
 import time
 from collections import deque
@@ -105,7 +106,7 @@ def move_callback(game_state):
     if(game_state["turn"] > 0):
         reward = 1
         if game_state["you"]["health"] == 100:
-            reward += 10
+            reward += 1
         if game_state["you"]["health"] == 100 and last_game_state["you"]["health"] < 5:
             reward += 40
         total_reward += reward
@@ -161,7 +162,7 @@ def signal_handler(sig, frame):
     finalize()
 
 def train():
-    global path, episode, signal
+    global path, episode
     if not os.path.exists("../pth/"):
         os.makedirs("../pth/")
     os.mkdir("../pth/"+str(int(time.time())))
