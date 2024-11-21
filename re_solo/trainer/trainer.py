@@ -1,5 +1,6 @@
 import os
 import random
+import sys
 import time
 from collections import deque
 
@@ -7,22 +8,20 @@ import numpy as np
 import torch
 from torch import optim, nn
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from re_solo.sneak.evaluator import Evaluator
-from re_solo.sneak.player import AIPlayer
-from re_solo.trainer.rules import Client, start_solo_game, GameSettings
+from rules import Client, start_solo_game, GameSettings
 from shared.rule import Direction
 
 # ハイパーパラメータ
 GAMMA = 0.99  # 割引率
 LR = 0.001    # 学習率
-BATCH_SIZE = 4
+BATCH_SIZE = 64
 EPSILON_START = 1.0
 EPSILON_END = 0.1
 EPSILON_DECAY = 500
 MEMORY_CAPACITY = 10000
 TARGET_UPDATE = 10
-BOARD_SIZE = 11  # 11x11の盤面
-NUM_CHANNELS = 6  # 入力チャネル（自身の頭、体、敵の頭など）
 
 class ReplayMemory:
     def __init__(self, capacity):
@@ -99,13 +98,16 @@ def start_callback(game_state):
 
 last_action = None
 
-def move_callback(game_state, player):
-    global state_tensor, total_reward, steps_done, last_action, memory, policy_net
+last_game_state = None
+def move_callback(game_state):
+    global state_tensor, total_reward, steps_done, last_action, memory, policy_net, last_game_state
     next_state_tensor = Evaluator.get_input_tensor(game_state)
     if(game_state["turn"] > 0):
         reward = 1
         if game_state["you"]["health"] == 100:
-            reward += 50
+            reward += 10
+        if game_state["you"]["health"] == 100 and last_game_state["you"]["health"] < 5:
+            reward += 40
         total_reward += reward
         reward = torch.tensor([reward], dtype=torch.float32).to(device)
         memory.push(state_tensor[0], state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
@@ -114,6 +116,7 @@ def move_callback(game_state, player):
     action = select_action(state_tensor, policy_net, steps_done, 4, device)
     last_action = action
     steps_done += 1
+    last_game_state = game_state
     return Direction.index(action)
 
 def end_callback(game_state):
@@ -132,21 +135,62 @@ def end_callback(game_state):
     print(f"total reward: {total_reward}")
     return 0
 
+path = ""
+episode = 0
+finished = False
+def finalize():
+    print("Training finished!")
+    # モデルの保存
+    evaluator = Evaluator()
+    evaluator.model = policy_net
+    evaluator.model.save(path + "model_final.pth")
+    print("Saved model")
+    torch.save({
+        'episode': episode,
+        'policy_net': policy_net.state_dict(),
+        'target_net': target_net.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'memory': memory.memory
+    }, path + "checkpoint.pth")
+    print("Saved checkpoint")
+    global finished
+    finished = True
+
+def signal_handler(sig, frame):
+    print('Training interrupted by SIGINT')
+    finalize()
+
 def train():
+    global path, episode, signal
     if not os.path.exists("../pth/"):
         os.makedirs("../pth/")
     os.mkdir("../pth/"+str(int(time.time())))
     path = "../pth/"+str(int(time.time()))+"/"
 
+    signal.signal(signal.SIGINT, signal_handler)
+
+    if len(sys.argv) > 1:
+        try:
+            checkpoint = torch.load(sys.argv[1],weights_only=False)
+            episode = checkpoint['episode']
+            policy_net.load_state_dict(checkpoint['policy_net'])
+            target_net.load_state_dict(checkpoint['target_net'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            memory.memory = checkpoint['memory']
+            print("Successfully loaded checkpoint")
+        except Exception as e:
+            print(e)
+            print("Failed to load checkpoint")
+
     # トレーニングループ
     num_episodes = 50000
-    for episode in range(num_episodes):
+    for eps in range(num_episodes - episode):
+        episode += 1
         evaluator = Evaluator()
         evaluator.model = policy_net
-        player = AIPlayer(evaluator)
         client = Client()
         client.on_start = start_callback
-        client.on_move = lambda game_state: move_callback(game_state, player)
+        client.on_move = lambda game_state: move_callback(game_state)
         client.on_end = end_callback
         setting = GameSettings()
         setting.seed = random.randint(0, 10000000)
@@ -155,8 +199,16 @@ def train():
         setting.food_spawn_chance = 0
         setting.minimum_food = 3
         result = start_solo_game(client, setting)
+
+        # ターゲットネットワークの更新
+        if episode % TARGET_UPDATE == 0:
+            target_net.load_state_dict(policy_net.state_dict())
+
         print(f"Episode {episode}: Turn{result["turn"]}")
         if episode % 2500 == 0:
             evaluator.model.save(path + f"model_{episode}.pth")
         if episode == num_episodes-1:
             evaluator.model.save(path + f"model_final.pth")
+        if finished:
+            break
+    finalize()
