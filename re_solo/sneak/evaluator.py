@@ -23,7 +23,7 @@ class Evaluator:
         return evaluator
 
     def evaluate(self, game_state):
-        return self.model(*self.get_input_tensor(game_state)).squeeze().tolist()
+        return self.model(*map(lambda x:x.unsqueeze(0),self.get_input_tensor(game_state))).squeeze().tolist()
 
     @staticmethod
     def get_input_tensor(game_state : dict) -> (torch.Tensor, torch.Tensor):
@@ -63,7 +63,6 @@ class EvaluatorModel(nn.Module):
     def forward(self, board_input, snake_input):
         cnn = self.cnn(board_input)
         cnn = cnn.view(-1, 64 * 6 * 6)
-        snake_input = snake_input.unsqueeze(0)
         input = torch.cat([cnn, snake_input], dim=1)
         q = self.fc(input)
         return q

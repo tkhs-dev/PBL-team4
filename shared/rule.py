@@ -1,7 +1,6 @@
 import copy
 from enum import Enum
 
-
 class TurnResult(Enum):
     CONTINUE = 0
     WIN = 1
@@ -23,6 +22,18 @@ class Direction(Enum):
             return -1,0
         elif self == Direction.RIGHT:
             return 1,0
+
+    @staticmethod
+    def index(index):
+        if index == 1:
+            return Direction.DOWN
+        elif index == 2:
+            return Direction.LEFT
+        elif index == 3:
+            return  Direction.RIGHT
+        else:
+            return Direction.UP
+
 
 def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     #------ IMPORTANT ------
