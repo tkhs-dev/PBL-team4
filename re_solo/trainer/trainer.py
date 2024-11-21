@@ -138,7 +138,7 @@ def end_callback(game_state):
 
 path = ""
 episode = 0
-finished = False
+signal_caught = False
 def finalize():
     print("Training finished!")
     # モデルの保存
@@ -154,12 +154,11 @@ def finalize():
         'memory': memory.memory
     }, path + "checkpoint.pth")
     print("Saved checkpoint")
-    global finished
-    finished = True
 
 def signal_handler(sig, frame):
     print('Training interrupted by SIGINT')
-    finalize()
+    global signal_caught
+    signal_caught = True
 
 def train():
     global path, episode
@@ -210,6 +209,6 @@ def train():
             evaluator.model.save(path + f"model_{episode}.pth")
         if episode == num_episodes-1:
             evaluator.model.save(path + f"model_final.pth")
-        if finished:
+        if signal_caught:
             break
     finalize()
