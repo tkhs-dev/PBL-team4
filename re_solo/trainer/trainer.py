@@ -12,7 +12,7 @@ from torch import optim, nn
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from re_solo.sneak.evaluator import Evaluator
 from rules import Client, start_solo_game, GameSettings
-from shared.rule import Direction
+from shared.rule import Direction, move, TurnResult
 
 # ハイパーパラメータ
 GAMMA = 0.99  # 割引率
@@ -20,33 +20,39 @@ LR = 0.001    # 学習率
 BATCH_SIZE = 64
 EPSILON_START = 1.0
 EPSILON_END = 0.1
-EPSILON_DECAY = 500
+EPSILON_DECAY = 3000
 MEMORY_CAPACITY = 10000
 TARGET_UPDATE = 10
 
 class ReplayMemory:
     def __init__(self, capacity):
         self.memory = deque(maxlen=capacity)
+        self.weights = deque(maxlen=capacity)
 
     def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done):
         self.memory.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
+        self.weights.append(100-game_state[0].item())
 
 
     def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+        return random.sample(self.memory, k=batch_size)
 
     def __len__(self):
         return len(self.memory)
 
 # ε-greedyポリシー
-def select_action(state, policy_net, steps_done, n_actions, device):
+def select_action(game_state, state, policy_net, steps_done, n_actions, device, force_safe_action=False):
     epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-1. * steps_done / EPSILON_DECAY)
     if random.random() > epsilon:
         with torch.no_grad():
-
             return policy_net(*map(lambda x:x.unsqueeze(0),state)).argmax(dim=1).item()  # 最適な行動
     else:
-        return random.randrange(n_actions)  # ランダム行動
+        choice = range(n_actions)
+        if force_safe_action:
+            choice = list(filter(lambda x: move(game_state,Direction.index(x))[0]==TurnResult.CONTINUE, choice))
+            if len(choice) == 0:
+                choice = range(n_actions)
+        return random.choice(list(choice))  # ランダムな行動
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 policy_net = Evaluator().model.to(device)
@@ -99,22 +105,21 @@ def start_callback(game_state):
 
 last_action = None
 
+force_safe = False
 last_game_state = None
 def move_callback(game_state):
     global state_tensor, total_reward, steps_done, last_action, memory, policy_net, last_game_state
     next_state_tensor = Evaluator.get_input_tensor(game_state)
     if(game_state["turn"] > 0):
         reward = 1
-        if game_state["you"]["health"] == 100:
-            reward += 1
-        if game_state["you"]["health"] == 100 and last_game_state["you"]["health"] < 5:
-            reward += 40
+        if game_state["you"]["health"] == 100 and last_game_state["you"]["health"] < 10:
+            reward += (10 - last_game_state["you"]["health"])*5
         total_reward += reward
         reward = torch.tensor([reward], dtype=torch.float32).to(device)
         memory.push(state_tensor[0], state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
         optimize_model()
     state_tensor = next_state_tensor
-    action = select_action(state_tensor, policy_net, steps_done, 4, device)
+    action = select_action(game_state,state_tensor, policy_net, steps_done, 4, device,force_safe)
     last_action = action
     steps_done += 1
     last_game_state = game_state
@@ -123,12 +128,7 @@ def move_callback(game_state):
 def end_callback(game_state):
     global total_reward, state_tensor, last_action, memory
     next_state_tensor = Evaluator.get_input_tensor(game_state)
-    reward = 0
-    head = game_state["you"]["head"]
-    if 0<=head["x"]<6 and 0<=head["y"]<6:
-        reward = -50
-    if game_state["you"]["health"] == 0:
-        reward -= 5
+    reward = -50
     total_reward += reward
     reward = torch.tensor([reward], dtype=torch.float32).to(device)
     memory.push(state_tensor[0], state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], True)
@@ -161,7 +161,7 @@ def signal_handler(sig, frame):
     signal_caught = True
 
 def train():
-    global path, episode
+    global path, episode, force_safe
     if not os.path.exists("../pth/"):
         os.makedirs("../pth/")
     os.mkdir("../pth/"+str(int(time.time())))
@@ -198,6 +198,7 @@ def train():
         setting.height = 6
         setting.food_spawn_chance = 0
         setting.minimum_food = 3
+        force_safe = random.random() < 0.5
         result = start_solo_game(client, setting)
 
         # ターゲットネットワークの更新
@@ -205,7 +206,7 @@ def train():
             target_net.load_state_dict(policy_net.state_dict())
 
         print(f"Episode {episode}: Turn{result["turn"]}")
-        if episode % 2500 == 0:
+        if episode % 500 == 0:
             evaluator.model.save(path + f"model_{episode}.pth")
         if episode == num_episodes-1:
             evaluator.model.save(path + f"model_final.pth")
