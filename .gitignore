@@ -4,3 +4,4 @@ __pycache__/
 .idea/
 venv/
 rules/
+/train-manager-api/.gradle/
