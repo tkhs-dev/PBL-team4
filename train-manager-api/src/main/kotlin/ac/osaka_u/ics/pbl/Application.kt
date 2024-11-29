@@ -1,9 +1,17 @@
 package ac.osaka_u.ics.pbl
 
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
 
 fun main(args: Array<String>) {
-    io.ktor.server.netty.EngineMain.main(args)
+    embeddedServer(Netty, port = 8080) {
+        install(ContentNegotiation) {
+            json()
+        }
+    }.start(wait = true)
 }
 
 fun Application.module() {
