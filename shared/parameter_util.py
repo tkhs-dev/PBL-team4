@@ -1,4 +1,4 @@
-#　必要なパラメーターを取得する関数を定義する
+#　必要なパラメーターを取得する関数を定義
 # example:
 #  def get_snake_length(game_state: dict) -> int:
 #      return game_state["you"]["length"]
