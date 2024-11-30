@@ -9,14 +9,16 @@ import io.ktor.server.resources.*
 
 fun main(args: Array<String>) {
     embeddedServer(Netty, port = 8080) {
-        install(ContentNegotiation) {
-            json()
-        }
-        install(Resources)
+        module()
     }.start(wait = true)
 }
 
 fun Application.module() {
     configureSecurity()
+    install(Resources)
     configureRouting()
+    configureStatus()
+    install(ContentNegotiation) {
+        json()
+    }
 }
