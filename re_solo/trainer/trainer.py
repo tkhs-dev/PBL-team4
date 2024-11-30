@@ -29,13 +29,13 @@ class ReplayMemory:
         self.memory = deque(maxlen=capacity)
         self.weights = deque(maxlen=capacity)
 
-    def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done):
+    def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done, weight=1):
         self.memory.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
-        self.weights.append(100-game_state[0].item())
+        self.weights.append(weight)
 
 
     def sample(self, batch_size):
-        return random.sample(self.memory, k=batch_size)
+        return random.choices(self.memory, k=batch_size, weights=self.weights)
 
     def __len__(self):
         return len(self.memory)
@@ -45,7 +45,7 @@ def select_action(game_state, state, policy_net, steps_done, n_actions, device, 
     epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-1. * steps_done / EPSILON_DECAY)
     if random.random() > epsilon:
         with torch.no_grad():
-            return policy_net(*map(lambda x:x.unsqueeze(0),state)).argmax(dim=1).item()  # 最適な行動
+            return policy_net(*map(lambda x:x.unsqueeze(0).to(device),state)).argmax(dim=1).item()  # 最適な行動
     else:
         choice = range(n_actions)
         if force_safe_action:
@@ -101,22 +101,35 @@ total_reward = 0
 def start_callback(game_state):
     global total_reward
     total_reward = 0
+    feed_health.clear()
     return 0
 
 last_action = None
 
 force_safe = False
 last_game_state = None
+feed_health=[]
 def move_callback(game_state):
     global state_tensor, total_reward, steps_done, last_action, memory, policy_net, last_game_state
     next_state_tensor = Evaluator.get_input_tensor(game_state)
     if(game_state["turn"] > 0):
-        reward = 1
-        if game_state["you"]["health"] == 100 and last_game_state["you"]["health"] < 10:
-            reward += (10 - last_game_state["you"]["health"])*5
+        reward = 0
+        weight = 1
+        if game_state["you"]["health"] == 100:
+            if last_game_state["you"]["health"] < 20:
+                reward += 10
+                weight = 3
+            elif last_game_state["you"]["health"] < 50:
+                reward += 5
+                weight = 2
+            elif last_game_state["you"]["health"] < 90:
+                reward += 2
+            feed_health.append(last_game_state["you"]["health"])
+        else:
+            reward += 1
         total_reward += reward
         reward = torch.tensor([reward], dtype=torch.float32).to(device)
-        memory.push(state_tensor[0], state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
+        memory.push(state_tensor[0], state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], False, weight)
         optimize_model()
     state_tensor = next_state_tensor
     action = select_action(game_state,state_tensor, policy_net, steps_done, 4, device,force_safe)
@@ -162,6 +175,7 @@ def signal_handler(sig, frame):
 
 def train():
     global path, episode, force_safe
+    print(f"Training on {device}")
     if not os.path.exists("../pth/"):
         os.makedirs("../pth/")
     os.mkdir("../pth/"+str(int(time.time())))
@@ -205,7 +219,7 @@ def train():
         if episode % TARGET_UPDATE == 0:
             target_net.load_state_dict(policy_net.state_dict())
 
-        print(f"Episode {episode}: Turn{result["turn"]}")
+        print(f"Episode {episode}: Turn{result["turn"]}, Feed: {sum(feed_health)/max(1,len(feed_health))}")
         if episode % 500 == 0:
             evaluator.model.save(path + f"model_{episode}.pth")
         if episode == num_episodes-1:
