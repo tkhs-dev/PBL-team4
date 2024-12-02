@@ -173,7 +173,7 @@ components:
         parameter:
           oneOf:
             - $ref: '#/components/schemas/ParameterSupervised'
-            - $ref: '#/components/schemas/ParameterRainforcedTraining'
+            - $ref: '#/components/schemas/ParameterReinforcedTraining'
     ParameterSupervised:
       type: object
       description: 教師あり学習時のパラメーター
@@ -187,7 +187,7 @@ components:
           description: 教師となるゲームのID
           example: game_id
 
-    ParameterRainforcedTraining:
+    ParameterReinforcedTraining:
       type: object
       description: 強化学習時のパラメーター
       properties:
