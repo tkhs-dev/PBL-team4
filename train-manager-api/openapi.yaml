@@ -5,18 +5,20 @@ info:
     学習管理API
   version: 1.0.0
 tags:
-  - name: train
-    description: 学習タスク関連
+  - name: assignment
+    description: 割り当てタスク関連
   - name: model
     description: モデル関連
   - name: queue
-    description: 学習タスクのキュー関連
+    description: タスクのキュー関連
+  - name: task
+    description: タスク関連
 paths:
-  /train/next:
+  /assignments/next:
     get:
       tags:
-        - train
-      summary: 次の学習タスクを取得する
+        - assignment
+      summary: 次のタスクを取得する
       description: ''
       responses:
         '200':
@@ -36,23 +38,20 @@ paths:
                     $ref: '#/components/schemas/TrainTask'
         '401':
           description: 認証情報が不正
-  /train/refresh:
+  /assignments/{id}/refresh:
     post:
       tags:
-        - train
-      summary: 学習タスクの期限を延長する
-      description: ''
-      requestBody:
-        required: true
-        content:
-          application/json: 
-            schema:
-              type: object
-              properties:
-                id:
-                  type: string
-                  format: uuid
-                  description: 対象のタスク
+        - assignment
+      summary: タスクの期限を延長する
+      description: 'タスクを割り当てられたクライアントのみが操作可能'
+      parameters:
+        - name: id
+          in: path
+          description: タスクの割り当てID
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: 成功
@@ -68,12 +67,20 @@ paths:
                     type: integer
                     format: int64
                     example: 1732974934257
-  /train/register:
+  /assignments/{id}/register:
     post:
       tags:
-        - train
-      summary: 学習タスクの結果を登録する
-      description: ''
+        - assignment
+      summary: タスクの結果を登録する
+      description: 'タスクを割り当てられたクライアントのみが操作可能'
+      parameters:
+        - name: id
+          in: path
+          description: タスクの割り当てID
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -112,11 +119,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError' 
-  /train/allocatedTasks:
+  /assignments:
     get:
       tags:
-        - train
-      summary: 割り当て済みのタスクを取得
+        - assignment
+      summary: タスク一覧を取得
       description: ''
       parameters:
         - name: client_name
@@ -125,13 +132,22 @@ paths:
           required: false
           schema:
             type: string
-        - name: contain_completed
+        - name: status
           in: query
-          description: 終了したタスクを含めるか
+          description: 検索対象のステータス
           required: false
           schema:
-            type: boolean
-            default: false
+            type: array
+            items:
+              type: string
+              enum:
+                - completed
+                - processing
+                - timeup
+                - error
+            default: [completed, processing, timeup, error]
+          style: matrix
+          explode: false
         - name: limit
           in: query
           required: false
@@ -149,8 +165,236 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AllocatedTask' 
-                
+                  $ref: '#/components/schemas/Assignment'
+
+  /models:
+    get:
+      tags:
+        - model
+      summary: モデル一覧を取得
+      description: ''
+      parameters:
+        - name: parent_id
+          in: query
+          description: 親モデルのID
+          required: false
+          schema:
+            type: string
+        - name: tracking_id
+          in: query
+          description: モデルの系統を示すID
+          required: false
+          schema:
+              type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 0
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Model'
+
+  /models/{id}:
+    get:
+      tags:
+        - model
+      summary: モデルを取得
+      description: ''
+      parameters:
+        - name: id
+          in: path
+          description: モデルのID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '404':
+          description: モデルが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /queue:
+    get:
+      tags:
+        - queue
+      summary: キューの状態を取得
+      description: ''
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    index:
+                      type: integer
+                      format: int32
+                    task:
+                      $ref: '#/components/schemas/TrainTask'
+
+    post:
+      tags:
+        - queue
+      summary: タスクをキューに追加
+      description: ''
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task:
+                  $ref: '#/components/schemas/TrainTask'
+      responses:
+        '201':
+          description: キューに追加成功
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /tasks:
+    get:
+      tags:
+          - task
+      summary: タスク一覧を取得
+      description: ''
+      parameters:
+        - name: contain_completed
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 0
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrainTask'
+
+  /tasks/generators:
+    get:
+      tags:
+          - task
+      summary: タスクの生成器一覧を取得
+      description: ''
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    index:
+                      type: integer
+                      format: int32
+                    generator:
+                      $ref: '#/components/schemas/TaskGenerator'
+
+    post:
+      tags:
+        - task
+      summary: タスクの生成器を登録
+      description: ''
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskGenerator'
+      responses:
+        '201':
+          description: 成功
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+    delete:
+        tags:
+            - task
+        summary: タスクの生成器を削除
+        description: ''
+        parameters:
+            - name: index
+              in: query
+              required: true
+              schema:
+                type: integer
+                format: int32
+        responses:
+            '200':
+              description: 成功
+            '400':
+              description: Bad Request
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ApiError'
+            '500':
+              description: Internal Error
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/ApiError'
 
 components:
   schemas:
@@ -160,10 +404,16 @@ components:
         id:
           type: string
           format: uuid
+
+        completed:
+          type: boolean
+          description: タスクが完了したかどうか
+
         base_model_id:
           type: string
           format: uuid
           description: 学習元となるモデルのID
+
         type:
           type: string
           description: タスクの種類
@@ -183,9 +433,11 @@ components:
           description: 教師となるプレイヤーID
           example: player
         game_id:
-          type: string
-          description: 教師となるゲームのID
-          example: game_id
+          type: array
+          items:
+            type: string
+            description: 教師となるゲームのID
+            example: game_id
 
     ParameterReinforcedTraining:
       type: object
@@ -197,20 +449,20 @@ components:
           description: 学習のエポック数
           example: 100
 
-    AllocatedTask:
+    Assignment:
       type: object
       description: 割り当て済みのタスク
       properties:
         id:
           type: string
           format: uuid
-        allocated_at:
+        assigned_at:
           type: integer
           format: int64
           description: タスクが割り当てられた時間
-        allocated_client:
+        client:
           type: string
-          description: 割り当てられたクライアント
+          description: 担当するクライアント
         deadline:
           type: integer
           format: int64
@@ -231,6 +483,54 @@ components:
         task:
           $ref : '#/components/schemas/TrainTask'
 
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+          description: モデルのバージョン
+        parent_id:
+          type: string
+          description: 親モデルのID
+        tracking_id:
+          type: string
+          description: モデルの系統を示すID
+        sequence:
+          type: integer
+          format: int32
+          description: モデルの系統の中での通し番号
+        task_id:
+          type: string
+          format: uuid
+          description: モデルが作成されたタスクのID
+        created_at:
+          type: integer
+          format: int64
+          description: モデルが作成された時間
+          example: 1732974934257
+
+    TaskGenerator:
+      type: object
+      properties:
+        type:
+          type: string
+          description: タスクの種類
+          example: supervised
+          enum:
+            - supervised
+            - reinforced
+        parameter:
+          oneOf:
+            - type: object
+              properties:
+                player_id:
+                  type: string
+                  description: 教師となるプレイヤーID
+                  example: player
+            - $ref: '#/components/schemas/ParameterReinforcedTraining'
     ApiError:
       type: object
       properties:
