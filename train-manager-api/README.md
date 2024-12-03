@@ -15,13 +15,7 @@ Dockerコンテナでの実行を想定している。
 すべてのAPIは認証が必要である。
 認証は、配布したBearerトークンをヘッダーに設定することで行う。
 ### エンドポイント
-#### 学習
-- `GET /train/next` 次の学習タスクを取得
-- `POST /train/register` 学習結果を登録
-- `POST /train/refresh` 学習の期限を更新
-- `GET /train/history` 学習履歴を取得
-#### モデル
-- `GET /model` モデル一覧を取得
-- `GET /model/{id}` モデル詳細を取得
+エンドポイントの詳細はOpenAPIでopenapi.yamlに記述している.
+詳細は[こちら](./openapi.yaml)を参照,もしくは,./apidoc.htmlをブラウザで開くことで確認できる。
 
 # 実装の詳細
