@@ -22,7 +22,7 @@ paths:
       description: ''
       responses:
         '200':
-          description: 成功。typeによってparameterの構造が変化することに注意。
+          description: 成功
           content:
             application/json:
               schema:
@@ -34,10 +34,15 @@ paths:
                   deadline:
                     type: integer
                     format: int64
-                  task: 
+                  task:
                     $ref: '#/components/schemas/TrainTask'
-        '401':
-          description: 認証情報が不正
+        '204':
+          description: 処理すべきタスクがない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
   /assignments/{id}/refresh:
     post:
       tags:
@@ -59,7 +64,7 @@ paths:
             application/json:
               schema:
                 type: object
-                properties: 
+                properties:
                   id:
                     type: string
                     format: uuid
@@ -67,6 +72,25 @@ paths:
                     type: integer
                     format: int64
                     example: 1732974934257
+        '400':
+          description: 与えられたパラメーターに問題がある
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: このクライアントに割り当てられたタスクではない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: タスクが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
   /assignments/{id}/register:
     post:
       tags:
@@ -108,17 +132,17 @@ paths:
         '201':
           description: 登録に成功
         '400':
-          description: Bad Request
+          description: 与えられたパラメーターに問題がある
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError' 
-        '500':
-          description: Internal Error
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: このクライアントに割り当てられたタスクではない
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError' 
+                $ref: '#/components/schemas/ApiError'
   /assignments:
     get:
       tags:
@@ -146,7 +170,6 @@ paths:
                 - timeup
                 - error
             default: [completed, processing, timeup, error]
-          style: matrix
           explode: false
         - name: limit
           in: query
@@ -156,16 +179,22 @@ paths:
             format: int32
             default: 10
             minimum: 0
-        
+
       responses:
         '200':
           description: 成功
-          content: 
-            application/json: 
+          content:
+            application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/Assignment'
+        '400':
+          description: 与えられたパラメーターに問題がある
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /models:
     get:
@@ -203,6 +232,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Model'
+        '400':
+          description: 与えられたパラメーターに問題がある
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /models/{id}:
     get:
@@ -231,12 +266,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-        '500':
-          description: Internal Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
+
   /queue:
     get:
       tags:
@@ -277,13 +307,7 @@ paths:
         '201':
           description: キューに追加成功
         '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-        '500':
-          description: Internal Error
+          description: 与えられたパラメーターに問題がある
           content:
             application/json:
               schema:
@@ -292,7 +316,7 @@ paths:
   /tasks:
     get:
       tags:
-          - task
+        - task
       summary: タスク一覧を取得
       description: ''
       parameters:
@@ -318,6 +342,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TrainTask'
+        '400':
+          description: 与えられたパラメーターに問題がある
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /tasks/generators:
     get:
@@ -356,13 +386,7 @@ paths:
         '201':
           description: 成功
         '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-        '500':
-          description: Internal Error
+          description: 与えられたパラメーターに問題がある
           content:
             application/json:
               schema:
@@ -383,14 +407,8 @@ paths:
         responses:
             '200':
               description: 成功
-            '400':
-              description: Bad Request
-              content:
-                application/json:
-                  schema:
-                    $ref: '#/components/schemas/ApiError'
-            '500':
-              description: Internal Error
+            '404':
+              description: 指定されたタスク生成器が存在しない
               content:
                 application/json:
                   schema:
