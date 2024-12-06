@@ -10,8 +10,8 @@
 
 import sys
 
-from evaluator import Evaluator
-from player import AIPlayer
+from duel_evaluator import Evaluator
+from duel_player import AIPlayer
 
 # Start server when `python main.py` is run
 if __name__ == "__main__":

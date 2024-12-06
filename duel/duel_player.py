@@ -1,7 +1,7 @@
 import os
 import sys
 
-from re_solo.sneak.evaluator import Evaluator
+from duel.duel_evaluator import Evaluator
 from shared.rule import Direction
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
