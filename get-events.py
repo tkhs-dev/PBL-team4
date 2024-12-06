@@ -7,8 +7,14 @@ def on_open(ws):
     print("WebSocket connection opened")
 
 def on_message(ws, message):
-    data = json.loads(message)  
-    print("Received message:", json.dumps(data, indent=2))  
+    data = json.loads(message)
+    snakes = data.get('Data', {}).get('Snakes', [])
+    if snakes:
+        snake = snakes[0] 
+        head = snake['Body'][0]
+        snake['Head'] = head
+
+    print("Modified message:", json.dumps(data, indent=2))
 
 def on_error(ws, error):
     print("WebSocket error:", error)
