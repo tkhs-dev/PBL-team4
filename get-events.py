@@ -10,9 +10,10 @@ def on_message(ws, message):
     data = json.loads(message)
     snakes = data.get('Data', {}).get('Snakes', [])
     if snakes:
-        snake = snakes[0] 
-        head = snake['Body'][0]
-        snake['Head'] = head
+        for sn in snakes:
+         snake = sn 
+         head = snake['Body'][0]
+         snake['Head'] = head
 
     print("Modified message:", json.dumps(data, indent=2))
 
