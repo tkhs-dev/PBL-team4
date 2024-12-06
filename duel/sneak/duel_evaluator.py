@@ -8,7 +8,7 @@ from torch import nn
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from shared.parameter_util import get_front_body, get_left_body, get_right_body, get_leftd_body, get_rightd_body, \
-    get_sneak_length, get_sneak_health, get_sneak_distance, get_sneak_foods, get_free_space
+    get_snake_length, get_snake_health, get_snake_distance, get_snake_foods, get_free_space
 
 
 class Evaluator:
@@ -50,7 +50,7 @@ class Evaluator:
             food_board[food["y"]][food["x"]] = 1
         one_hot_encoded = np.stack([sneak0_body_board, sneak0_head_board, sneak1_body_board, sneak1_head_board, food_board], axis=0)
         board_tensor = torch.tensor(one_hot_encoded, dtype=torch.float32)
-        game_tensor = torch.tensor([get_sneak_health(game_state)/100,get_sneak_length(game_state)/36], dtype=torch.float32)
+        game_tensor = torch.tensor([get_snake_health(game_state)/100,get_snake_length(game_state)/36], dtype=torch.float32)
         return board_tensor,game_tensor
 
 
