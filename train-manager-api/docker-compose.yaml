@@ -1,5 +1,6 @@
 services:
     train-manager-api:
+        container_name: train-manager-api
         build:
           context: .
           dockerfile: Dockerfile

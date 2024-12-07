@@ -10,7 +10,6 @@ data class NextResponse(
     val deadline: Long,
     val status: String,
     val ststus_changed_at: Long,
-    val task: Task
 )
 
 data class RefreshResponse(

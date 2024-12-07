@@ -9,6 +9,7 @@ import io.ktor.server.response.*
 fun Application.configureStatus() {
     install(StatusPages) {
         exception<Throwable> { call,cause ->
+            cause.printStackTrace()
             if(cause is ApiException){
                 when(cause){
                     is ApiException.NotFoundException -> call.respond(HttpStatusCode.NotFound, ApiError.NOT_FOUND)
