@@ -35,7 +35,7 @@ class TaskResource{
 
 fun Application.configureRouting() {
     val sampleHandler = SampleHandler()
-    val tasksHandler = TasksHandler()
+    val tasksHandler = TasksHandler(TaskRepositoryImpl(), TaskGeneratorRepositoryImpl())
     routing {
         get<SampleResource.Memos> {
             call.respond(sampleHandler.handleGetMemos())
