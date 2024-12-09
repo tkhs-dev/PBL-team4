@@ -7,11 +7,13 @@ import ac.osaka_u.ics.pbl.model.PostGeneratorRequest
 import io.ktor.http.*
 import io.ktor.resources.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.resources.*
 import io.ktor.server.resources.post
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.koin.ktor.ext.inject
 
 @Resource("/sample")
 class SampleResource{
@@ -35,7 +37,7 @@ class TaskResource{
 
 fun Application.configureRouting() {
     val sampleHandler = SampleHandler()
-    val tasksHandler = TasksHandler(TaskRepositoryImpl(), TaskGeneratorRepositoryImpl())
+    val tasksHandler by inject<TasksHandler>()
     routing {
         get<SampleResource.Memos> {
             call.respond(sampleHandler.handleGetMemos())
@@ -48,27 +50,28 @@ fun Application.configureRouting() {
             sampleHandler.handlePostMemo(memo)
             call.respond(HttpStatusCode.Created)
         }
-
-        get<TaskResource> {
-            call.respond(tasksHandler.handleGetTasks())
-        }
-        get<TaskResource.TaskId> { taskId ->
-            call.respond(tasksHandler.handleGetTask(taskId.id))
-        }
-        get<TaskResource.Generators> {
-            call.respond(tasksHandler.handleGetGenerators())
-        }
-        post<TaskResource.Generators> {
-            val request = call.receive<PostGeneratorRequest>()
-            val resp = tasksHandler.handlePostGenerator(request)
-            call.respond(HttpStatusCode.Created, resp)
-        }
-        get<TaskResource.Generators.GeneratorId> { generatorId ->
-            call.respond(tasksHandler.handleGetGenerator(generatorId.id))
-        }
-        delete<TaskResource.Generators.GeneratorId> { generatorId ->
-            tasksHandler.handleDeleteGenerator(generatorId.id)
-            call.respond(HttpStatusCode.NoContent)
+        authenticate {
+            get<TaskResource> {
+                call.respond(tasksHandler.handleGetTasks())
+            }
+            get<TaskResource.TaskId> { taskId ->
+                call.respond(tasksHandler.handleGetTask(taskId.id))
+            }
+            get<TaskResource.Generators> {
+                call.respond(tasksHandler.handleGetGenerators())
+            }
+            post<TaskResource.Generators> {
+                val request = call.receive<PostGeneratorRequest>()
+                val resp = tasksHandler.handlePostGenerator(request)
+                call.respond(HttpStatusCode.Created, resp)
+            }
+            get<TaskResource.Generators.GeneratorId> { generatorId ->
+                call.respond(tasksHandler.handleGetGenerator(generatorId.id))
+            }
+            delete<TaskResource.Generators.GeneratorId> { generatorId ->
+                tasksHandler.handleDeleteGenerator(generatorId.id)
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
     }
 }
