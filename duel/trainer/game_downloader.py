@@ -1,6 +1,8 @@
 import websocket
 import json
 
+from shared.rule import Direction
+
 class GameDownloader:
     def __init__(self):
         self.player_id = None
@@ -42,17 +44,18 @@ class GameDownloader:
                 snake = sn
                 head = snake['body'][0]
                 snake['head'] = head
+                snake['length'] = len(snake['body'])
                 if snake['author'] == self.player_id:
                     turn_result["game_state"]['you'] = snake
                     if turn_result["game_state"]["turn"] > 0:
                         prev_head = snake['body'][1]
-                        action = "up"
+                        action = Direction.UP
                         if head['x'] > prev_head['x']:
-                            action = "right"
+                            action = Direction.RIGHT
                         elif head['x'] < prev_head['x']:
-                            action = "left"
+                            action = Direction.LEFT
                         elif head['y'] < prev_head['y']:
-                            action = "down"
+                            action = Direction.DOWN
                         self.result[-1]['action'] = action
 
 
