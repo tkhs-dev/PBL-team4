@@ -2,20 +2,29 @@ import websocket
 import json
 
 class GameDownloader:
+    def _lowercase_keys(self, obj):
+        """
+        JSONパース時に辞書のキーを小文字に変換する関数
+        """
+        if isinstance(obj, dict):
+            # キーを小文字に変換
+            return {key.lower(): value for key, value in obj.items()}
+        return obj
+
     def _on_open(self, ws):
         print("WebSocket connection opened")
         self.result = []
 
     def _on_message(self, ws, message):
-        data = json.loads(message)
-        data['Data']['width'] = 11
-        data['Data']['Height'] = 11
-        snakes = data.get('Data', {}).get('Snakes', [])
+        data = json.loads(message, object_hook=self._lowercase_keys)
+        data['data']['width'] = 11
+        data['data']['height'] = 11
+        snakes = data.get('data', {}).get('snakes', [])
         if snakes:
             for sn in snakes:
                 snake = sn
-                head = snake['Body'][0]
-                snake['Head'] = head
+                head = snake['body'][0]
+                snake['head'] = head
 
         self.result.append(data)
 
@@ -39,8 +48,8 @@ class GameDownloader:
         return self.result
 
 #           --USAGE--
-# if __name__ == "__main__":
-#     downloader = GameDownloader()
-#     data = downloader.download_data("c70b1355-9a9d-4e5a-8a79-063d9ce4d2ff")
-#     print(data)
+if __name__ == "__main__":
+    downloader = GameDownloader()
+    data = downloader.download_data("c70b1355-9a9d-4e5a-8a79-063d9ce4d2ff")
+    print(data)
 
