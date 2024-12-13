@@ -25,6 +25,7 @@ class AssignmentUpdateBuilder{
 
 interface AssignmentRepository {
     fun findAssignmentById(id: UUID): Assignment?
+    fun findAssignmentByUserId(userId: Int): List<Assignment>
     fun findAssignments(): List<Assignment>
     fun createAssignment(assignment: Assignment): Assignment
     fun updateAssignment(id: UUID, update: AssignmentUpdateBuilder.() -> Unit): Assignment?
@@ -36,6 +37,10 @@ class AssignmentRepositoryImpl : AssignmentRepository {
         return transaction {
             AssignmentEntity.findById(id)?.toModel()
         }
+    }
+
+    override fun findAssignmentByUserId(userId: Int): List<Assignment> {
+        TODO("Not yet implemented")
     }
 
     override fun findAssignments(): List<Assignment> {
