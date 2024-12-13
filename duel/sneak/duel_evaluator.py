@@ -50,7 +50,7 @@ class Evaluator:
             food_board[food["y"]][food["x"]] = 1
         one_hot_encoded = np.stack([sneak0_body_board, sneak0_head_board, sneak1_body_board, sneak1_head_board, food_board], axis=0)
         board_tensor = torch.tensor(one_hot_encoded, dtype=torch.float32)
-        game_tensor = torch.tensor([get_snake_health(game_state)/100,get_snake_length(game_state)/36], dtype=torch.float32)
+        game_tensor = torch.tensor([get_snake_health(game_state)/100,get_snake_length(game_state)/121], dtype=torch.float32)
         return board_tensor,game_tensor
 
 
