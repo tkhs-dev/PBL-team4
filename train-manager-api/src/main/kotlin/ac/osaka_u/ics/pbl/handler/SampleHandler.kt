@@ -1,8 +1,8 @@
 package ac.osaka_u.ics.pbl.handler
 
 import ac.osaka_u.ics.pbl.ApiException
+import ac.osaka_u.ics.pbl.domain.repos.MemoRepository
 import ac.osaka_u.ics.pbl.model.Memo
-import ac.osaka_u.ics.pbl.repos.MemoRepository
 import kotlinx.serialization.Serializable
 
 @Serializable

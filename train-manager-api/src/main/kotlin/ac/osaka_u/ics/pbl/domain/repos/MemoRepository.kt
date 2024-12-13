@@ -1,4 +1,4 @@
-package ac.osaka_u.ics.pbl.repos
+package ac.osaka_u.ics.pbl.domain.repos
 
 import ac.osaka_u.ics.pbl.model.Memo
 
