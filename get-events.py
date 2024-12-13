@@ -1,13 +1,15 @@
 import websocket
 import json
 
-url = "wss://engine.battlesnake.com/games/529c4b28-bcf9-4d09-ab32-ab36fe75869b/events"
+url = "wss://engine.battlesnake.com/games/c70b1355-9a9d-4e5a-8a79-063d9ce4d2ff/events"
 
 def on_open(ws):
     print("WebSocket connection opened")
 
 def on_message(ws, message):
     data = json.loads(message)
+    data['Data']['width'] = 11
+    data['Data']['Height'] = 11
     snakes = data.get('Data', {}).get('Snakes', [])
     if snakes:
         for sn in snakes:
@@ -15,7 +17,8 @@ def on_message(ws, message):
          head = snake['Body'][0]
          snake['Head'] = head
 
-    print("Modified message:", json.dumps(data, indent=2))
+
+    print(json.dumps(data['Data'], indent=2))
 
 def on_error(ws, error):
     print("WebSocket error:", error)
