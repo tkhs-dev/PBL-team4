@@ -7,8 +7,7 @@ import torch
 from torch import nn
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-from shared.parameter_util import get_front_body, get_left_body, get_right_body, get_leftd_body, get_rightd_body, \
-    get_snake_length, get_snake_health, get_snake_distance, get_snake_foods, get_free_space
+from shared.parameter_util import get_snake_length, get_snake_health
 
 
 class Evaluator:
