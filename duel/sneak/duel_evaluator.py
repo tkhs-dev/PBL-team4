@@ -38,13 +38,15 @@ class Evaluator:
                 sneak0_body_board[body["y"]][body["x"]] = 1
         if 0 <= you["head"]["x"] < 11 and 0 <= you["head"]["y"] < 11:
             sneak0_head_board[you["head"]["y"]][you["head"]["x"]] = 1
-        
-        sneak1 = game_state["board"]["snakes"][1]
-        for body in sneak1["body"]:
-            if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
-                sneak1_body_board[body["y"]][body["x"]] = 1
-        if 0 <= sneak1["head"]["x"] < 11 and 0 <= sneak1["head"]["y"] < 11:
-            sneak1_head_board[sneak1["head"]["y"]][sneak1["head"]["x"]] = 1
+
+        if len(game_state["board"]["snakes"]) == 2:
+            sneak1 = game_state["board"]["snakes"][1]
+            for body in sneak1["body"]:
+                if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
+                    sneak1_body_board[body["y"]][body["x"]] = 1
+            if 0 <= sneak1["head"]["x"] < 11 and 0 <= sneak1["head"]["y"] < 11:
+                sneak1_head_board[sneak1["head"]["y"]][sneak1["head"]["x"]] = 1
+
         
         for food in game_state["board"]["food"]:
             food_board[food["y"]][food["x"]] = 1

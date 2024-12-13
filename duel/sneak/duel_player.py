@@ -18,7 +18,6 @@ class AIPlayer(IPlayer):
         print("GAME OVER\n")
 
     def on_move(self, game_state):
-        print(game_state)
         q = self.evaluator.evaluate(game_state)
         direction = max(zip(Direction,q), key = lambda x:x[1])[0]
         return direction
