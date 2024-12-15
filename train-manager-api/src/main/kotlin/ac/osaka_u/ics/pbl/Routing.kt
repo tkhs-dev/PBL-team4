@@ -1,9 +1,10 @@
 package ac.osaka_u.ics.pbl
 
-import ac.osaka_u.ics.pbl.handler.SampleHandler
+import ac.osaka_u.ics.pbl.handler.AssignmentsHandler
+import ac.osaka_u.ics.pbl.handler.QueueHandler
 import ac.osaka_u.ics.pbl.handler.TasksHandler
-import ac.osaka_u.ics.pbl.model.Memo
 import ac.osaka_u.ics.pbl.model.PostGeneratorRequest
+import ac.osaka_u.ics.pbl.model.TaskRequest
 import io.ktor.http.*
 import io.ktor.resources.*
 import io.ktor.server.application.*
@@ -14,15 +15,6 @@ import io.ktor.server.resources.post
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.koin.ktor.ext.inject
-
-@Resource("/sample")
-class SampleResource{
-    @Resource("memos")
-    class Memos(val parent: SampleResource = SampleResource()) {
-        @Resource("{id}")
-        class MemoId(val parent: Memos = Memos(), val id: Int)
-    }
-}
 
 @Resource("/tasks")
 class TaskResource{
@@ -35,22 +27,54 @@ class TaskResource{
     }
 }
 
+@Resource("/assignments")
+class AssignmentsResource{
+    @Resource("next")
+    class Next(val parent: AssignmentsResource = AssignmentsResource())
+    @Resource("{id}")
+    class AssignmentId(val parent: AssignmentsResource = AssignmentsResource(), val id: String){
+        @Resource("register")
+        class Register(val parent: AssignmentId)
+        @Resource("refresh")
+        class Refresh(val parent: AssignmentId)
+    }
+}
+
+@Resource("/queue")
+class QueueResource
+
 fun Application.configureRouting() {
-    val sampleHandler = SampleHandler()
+    val assignmentsHandler by inject<AssignmentsHandler>()
+    val queueHandler by inject<QueueHandler>()
     val tasksHandler by inject<TasksHandler>()
     routing {
-        get<SampleResource.Memos> {
-            call.respond(sampleHandler.handleGetMemos())
-        }
-        get<SampleResource.Memos.MemoId> { memoId ->
-            call.respond(sampleHandler.handleGetMemo(memoId.id))
-        }
-        post<SampleResource.Memos> {
-            val memo = call.receive<Memo>()
-            sampleHandler.handlePostMemo(memo)
-            call.respond(HttpStatusCode.Created)
-        }
         authenticate {
+            get<AssignmentsResource.Next> {
+                val clientId = call.principal<UserIdPrincipal>()!!.name
+                val res = assignmentsHandler.handleGetNextAssignment(clientId)
+                if (res != null) {
+                    call.respond(res)
+                } else {
+                    call.respond(HttpStatusCode.NoContent)
+                }
+            }
+            post<AssignmentsResource.AssignmentId.Register> { assignmentId ->
+                val clientId = call.principal<UserIdPrincipal>()!!.name
+                call.respond(assignmentsHandler.handleRegisterAssignment(assignmentId.parent.id, clientId))
+            }
+            post<AssignmentsResource.AssignmentId.Refresh> { assignmentId ->
+                val clientId = call.principal<UserIdPrincipal>()!!.name
+                call.respond(assignmentsHandler.handleRefreshAssignment(assignmentId.parent.id, clientId))
+            }
+
+            get<QueueResource> {
+                call.respond(queueHandler.handleGetAll())
+            }
+            post<QueueResource> {
+                val request = call.receive<TaskRequest>()
+                call.respond(queueHandler.handlePost(request))
+            }
+
             get<TaskResource> {
                 call.respond(tasksHandler.handleGetTasks())
             }

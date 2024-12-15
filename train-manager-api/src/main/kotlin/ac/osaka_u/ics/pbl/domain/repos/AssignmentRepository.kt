@@ -40,7 +40,9 @@ class AssignmentRepositoryImpl : AssignmentRepository {
     }
 
     override fun findAssignmentByUserId(userId: Int): List<Assignment> {
-        TODO("Not yet implemented")
+        return transaction {
+            AssignmentEntity.find { Assignments.client eq userId }.map { it.toModel() }
+        }
     }
 
     override fun findAssignments(): List<Assignment> {

@@ -17,6 +17,6 @@ fun ClientEntity.toModel() = Client(
     secret = secret
 )
 
-fun Client.toEntity() = ClientEntity.new(id) {
+fun Client.toEntity() = ClientEntity.new {
     secret = this@toEntity.secret
 }

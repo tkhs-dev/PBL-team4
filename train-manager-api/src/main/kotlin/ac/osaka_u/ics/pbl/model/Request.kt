@@ -13,3 +13,11 @@ data class PostGeneratorRequest(
     @Serializable(with = ParameterMapSerializer::class)
     val parameters: Map<String,@Contextual Any>
 )
+
+@Serializable
+data class TaskRequest(
+    val baseModelId: String?,
+    val type: TaskType,
+    @Serializable(with = ParameterMapSerializer::class)
+    val parameters: Map<String,@Contextual Any>
+)

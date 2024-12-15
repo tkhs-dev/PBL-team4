@@ -48,4 +48,6 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
 
     implementation("org.postgresql:postgresql:42.7.4")
+
+    implementation("org.jsoup:jsoup:1.18.3")
 }
