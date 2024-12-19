@@ -11,7 +11,7 @@ from logging import getLogger, DEBUG, StreamHandler, Formatter
 import torch
 from torch.utils.data import Dataset
 
-from api_client import TestApiClient
+from api_client import TestApiClient, ApiClientImpl
 from duel.sneak.duel_evaluator import Evaluator, EvaluatorModel
 from game_downloader import GameDownloader
 from shared.rule import Direction
@@ -185,6 +185,6 @@ def train():
     if not s:
         raise Exception("secret.txt is empty")
     logger.debug("Loaded secret key")
-    # api_client = ApiClient(api_url='http://localhost', secret_key=s)
-    api_client = TestApiClient()
+    api_client = ApiClientImpl(api_url='http://localhost:8080', secret_key=s)
+    # api_client = TestApiClient()
     Trainer(logger).start(api_client)
