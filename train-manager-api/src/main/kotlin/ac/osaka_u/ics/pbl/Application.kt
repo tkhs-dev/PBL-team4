@@ -2,7 +2,7 @@ package ac.osaka_u.ics.pbl
 
 import ac.osaka_u.ics.pbl.domain.model.Client
 import ac.osaka_u.ics.pbl.domain.repos.*
-import ac.osaka_u.ics.pbl.handler.TasksHandler
+import ac.osaka_u.ics.pbl.handler.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
@@ -47,8 +47,10 @@ fun Application.onDebug(block: Application.() -> Unit) {
 val module = module {
     singleOf(::TaskRepositoryImpl){bind<TaskRepository>()}
     singleOf(::TaskGeneratorRepositoryImpl){bind<TaskGeneratorRepository>()}
+    singleOf(::AssignmentRepositoryImpl){bind<AssignmentRepository>()}
     singleOf(::ClientRepositoryImpl){bind<ClientRepository>()}
     singleOf(::TasksHandler)
+    singleOf(::AssignmentsHandler)
 }
 
 val Application.debug: Boolean

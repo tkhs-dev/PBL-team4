@@ -13,7 +13,7 @@ data class NextResponse(
     val client: String,
     val deadline: Long,
     val status: String,
-    val ststus_changed_at: Long,
+    val status_changed_at: Long,
 )
 
 data class RefreshResponse(
@@ -56,6 +56,7 @@ fun TaskGenerator.toResponse() = TaskGeneratorResponse(
     weight = weight,
     parameters = parameters
 )
+
 
 
 

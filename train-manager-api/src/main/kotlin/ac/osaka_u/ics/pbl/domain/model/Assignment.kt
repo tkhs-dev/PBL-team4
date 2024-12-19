@@ -1,6 +1,7 @@
 package ac.osaka_u.ics.pbl.domain.model
 
 import ac.osaka_u.ics.pbl.common.AssignmentStatus
+import ac.osaka_u.ics.pbl.model.Task
 import kotlinx.datetime.Instant
 import java.util.*
 
