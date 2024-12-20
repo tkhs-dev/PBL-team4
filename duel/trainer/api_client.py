@@ -43,7 +43,7 @@ class ApiClientImpl(ApiClient):
         self.counter = 0
 
     def register_client(self, name: str) -> Dict | None:
-        response = self._post('clients', {"user":name})
+        response = requests.post(f'{self.url}/clients', json={"user":name})
         response.raise_for_status()
         return response.json()
 

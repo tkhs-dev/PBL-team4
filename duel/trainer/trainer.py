@@ -1,3 +1,4 @@
+import json
 import signal
 import sys
 import threading
@@ -172,7 +173,13 @@ class Trainer:
                 self.logger.debug("Timer canceled")
                 self.timer.cancel()
 
+def file_exists_and_not_empty(file_path: str) -> bool:
+    return os.path.exists(file_path) and os.stat(file_path).st_size != 0
+
 def train():
+    #APIのURLを設定
+    api_url = 'http://localhost:8080'
+
     logger = getLogger("Trainer")
     lvl = DEBUG
     ch = StreamHandler(stream=sys.stdout)
@@ -180,19 +187,24 @@ def train():
     ch.setFormatter(Formatter('[%(asctime)s %(levelname)s] %(message)s'))
     logger.setLevel(lvl)
     logger.addHandler(ch)
-    with open("./user.txt") as f:
-        s = f.read()
-    if not s:
-        logger.error("user.txt is empty. Please create user.txt at the same directory as this script and write your user name.")
-        return
 
-    with open("./secret.txt") as f:
-        s = f.read()
-    if not s:
-        logger.info("secret.txt is empty. Register this client to the server.")
+    if not file_exists_and_not_empty("client.json"):
+        logger.debug("client.json is empty. Register client first.")
+        if not file_exists_and_not_empty("user.txt"):
+            logger.error("user.txt is empty. Please create user.txt and write your user id.")
+            return
+        with open("user.txt", "r") as f:
+            user_id = f.read().strip()
+        client = ApiClientImpl(api_url=api_url, secret_key="").register_client(user_id)
+        logger.debug(f"Registered as {client['id']}")
+        with open("client.json", "w") as f:
+            f.write(json.dumps(client))
 
-        return
-    logger.debug("Loaded secret key")
-    api_client = ApiClientImpl(api_url='http://localhost:8080', secret_key=s)
+    with open("client.json", "r") as f:
+        s = f.read()
+    if s:
+        client = json.loads(s)
+    logger.info(f"Start training as {client["id"]}")
+    api_client = ApiClientImpl(api_url=api_url, secret_key=client["secret"])
     # api_client = TestApiClient()
     Trainer(logger).start(api_client)
