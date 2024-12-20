@@ -1,8 +1,9 @@
 package ac.osaka_u.ics.pbl
 
-import ac.osaka_u.ics.pbl.domain.model.Client
 import ac.osaka_u.ics.pbl.domain.repos.*
-import ac.osaka_u.ics.pbl.handler.*
+import ac.osaka_u.ics.pbl.handler.AssignmentsHandler
+import ac.osaka_u.ics.pbl.handler.QueueHandler
+import ac.osaka_u.ics.pbl.handler.TasksHandler
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
@@ -11,7 +12,6 @@ import io.ktor.server.resources.*
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
-import org.koin.ktor.ext.get
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 
@@ -28,8 +28,8 @@ fun Application.module() {
         json()
     }
     onDebug {
-        val clientRepo = get<ClientRepository>()
-        clientRepo.createClient(Client(-1, "test"))
+//        val clientRepo = get<ClientRepository>()
+//        clientRepo.createClient(Client(-1, "test"))
     }
 }
 
@@ -48,9 +48,12 @@ val module = module {
     singleOf(::TaskRepositoryImpl){bind<TaskRepository>()}
     singleOf(::TaskGeneratorRepositoryImpl){bind<TaskGeneratorRepository>()}
     singleOf(::AssignmentRepositoryImpl){bind<AssignmentRepository>()}
+    singleOf(::QueueRepositoryImpl){bind<QueueRepository>()}
+    singleOf(::ModelRepositoryImpl){bind<ModelRepository>()}
     singleOf(::ClientRepositoryImpl){bind<ClientRepository>()}
     singleOf(::TasksHandler)
     singleOf(::AssignmentsHandler)
+    singleOf(::QueueHandler)
 }
 
 val Application.debug: Boolean

@@ -3,74 +3,106 @@ package ac.osaka_u.ics.pbl.handler
 import ac.osaka_u.ics.pbl.ApiException
 import ac.osaka_u.ics.pbl.common.AssignmentStatus
 import ac.osaka_u.ics.pbl.domain.model.Assignment
+import ac.osaka_u.ics.pbl.domain.model.Model
+import ac.osaka_u.ics.pbl.domain.model.Task
 import ac.osaka_u.ics.pbl.domain.repos.AssignmentRepository
+import ac.osaka_u.ics.pbl.domain.repos.ModelRepository
 import ac.osaka_u.ics.pbl.domain.repos.QueueRepository
-import ac.osaka_u.ics.pbl.generateTask
-import ac.osaka_u.ics.pbl.model.Task
-import ac.osaka_u.ics.pbl.model.TaskGeneratorResponse
-import ac.osaka_u.ics.pbl.model.TaskResponse
+import ac.osaka_u.ics.pbl.domain.repos.TaskGeneratorRepository
+import ac.osaka_u.ics.pbl.model.ModelResponse
+import ac.osaka_u.ics.pbl.model.NextResponse
+import ac.osaka_u.ics.pbl.model.toNextResponse
 import ac.osaka_u.ics.pbl.model.toResponse
-import ac.osaka_u.ics.pbl.taskQueue
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.response.*
+import io.ktor.server.plugins.*
+import kotlinx.datetime.Clock
 import java.util.*
-import kotlinx.datetime.*
+import kotlin.time.Duration.Companion.minutes
 
-class AssignmentsHandler(private val assignmentRepo: AssignmentRepository, private val queueRepo: QueueRepository) {
-    fun assignmentNext(id: String):  {
-        val intId = id.toIntOrNull() ?: throw ApiException.BadRequestException("Invalid UserId")
-        val assignedTask = assignmentRepo.findAssignmentByUserId(intId)
-        if (assignedTask.isNotEmpty()){
-            return assignedTask
-        } else {
-            val taskFromQueue = queueRepo.dequeue()
-            if (taskFromQueue != null) {
-                assignmentRepo.findAssignmentById(id) = taskFromQueue
-                return taskFromQueue
-                //call.respond(taskFromQueue)
-            } else {
-                val newTask = generateTask()
-                if (newTask != null) {
-                    taskQueue.add(newTask)
-                    return newTask
-                    //call.respond(newTask)
-                } else {
-                    return -1
-                    //call.respond(HttpStatusCode.NoContent)
+class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, private val queueRepository: QueueRepository, private val taskGeneratorRepository: TaskGeneratorRepository, private val modelRepository: ModelRepository) {
+    private fun generateTask(): Task? {
+        return null
+    }
+
+    fun handleGetNextAssignment(clientId: String): NextResponse? {
+        val id = clientId.toIntOrNull() ?: throw BadRequestException("Invalid client id")
+        val assignment = assignmentRepos.findAssignmentByUserId(id)
+
+        // 未処理のタスクがあればそれを返す
+        assignment.firstOrNull{it.status == AssignmentStatus.PROCESSING}
+            ?.let {
+                // タスクがタイムアウトしていたらタイムアウト状態にする
+                if (it.deadline < Clock.System.now()) {
+                    assignmentRepos.updateAssignment(it.id){
+                        status = AssignmentStatus.TIMEOUT
+                    }
+                }else{
+                    return it.toNextResponse()
                 }
             }
+
+        // キューからタスクを取得
+        val task = queueRepository.dequeue() ?: generateTask() ?: return null
+
+        // タスクを処理中にする
+        return assignmentRepos.createAssignment(
+            Assignment(
+                id = UUID.randomUUID(),
+                assignedAt = Clock.System.now(),
+                clientId = id,
+                deadline = Clock.System.now().plus(60.minutes),
+                status = AssignmentStatus.PROCESSING,
+                statusChangedAt = Clock.System.now(),
+                task = task
+            )
+        ).toNextResponse()
+    }
+
+    fun handleRegisterAssignment(id: String, clientId: String): ModelResponse {
+        val assignment = assignmentRepos.findAssignmentById(UUID.fromString(id)) ?: throw BadRequestException("Invalid assignment id")
+        if (assignment.clientId != clientId.toIntOrNull()) {
+            // クライアントIDが一致しない場合はエラー
+            throw ApiException.ForbiddenException()
         }
-        return taskRepo.findTasks().map { it.toResponse() }
-    }
 
-    fun convertTaskToAssignment(
-        task: Task,
-        clientId: Int,
-        deadline: Instant = Clock.System.now().plus(5 * 60, kotlinx.datetime.DateTimeUnit.SECOND),
-        status: AssignmentStatus = AssignmentStatus.PROCESSING
-    ): Assignment {
-        return Assignment(
-            id = UUID.randomUUID(),
-            assignedAt = Clock.System.now(),
-            clientId = clientId,
-            deadline = deadline,
-            status = status,
-            statusChangedAt = Clock.System.now(),
-            task = task
-        )
-    }
-
-    fun handleGetTask(id: String): TaskResponse {
-        val uid = try{
-            UUID.fromString(id) ?: throw IllegalArgumentException()
-        }catch (e: IllegalArgumentException){
-            throw ApiException.BadRequestException("Invalid task ID")
+        if (assignment.status != AssignmentStatus.PROCESSING) {
+            // タスクが処理中でない場合はエラー
+            throw BadRequestException("You can only register processing-state assignments")
         }
-        return taskRepo.findTaskById(uid)?.toResponse() ?: throw ApiException.NotFoundException()
+
+        assignmentRepos.updateAssignment(assignment.id) {
+            status = AssignmentStatus.COMPLETED
+        }
+        val parentModel = assignment.task.baseModelId?.let {
+            modelRepository.findModelById(it) ?: throw BadRequestException("Invalid model id")
+        }
+        return modelRepository.createModel(
+            Model(
+                id = UUID.randomUUID(),
+                version = 1,
+                parentId = parentModel?.id,
+                rootModel = parentModel?.rootModel,
+                sequence = parentModel?.sequence?.plus(1) ?: 0,
+                taskId = assignment.task.id,
+                createdAt = Clock.System.now(),
+            )
+        ).toResponse()
     }
 
-    fun handleGetGenerators(): List<TaskGeneratorResponse> {
-        return generatorRepo.findTaskGenerators().map { it.toResponse() }
+    fun handleRefreshAssignment(id: String, clientId: String) {
+        val assignment = assignmentRepos.findAssignmentById(UUID.fromString(id)) ?: throw BadRequestException("Invalid assignment id")
+        if (assignment.clientId != clientId.toIntOrNull()) {
+            // クライアントIDが一致しない場合はエラー
+            throw ApiException.ForbiddenException()
+        }
+
+        if (assignment.status != AssignmentStatus.PROCESSING) {
+            // タスクが処理中でない場合はエラー
+            throw BadRequestException("You can only refresh processing-state assignments")
+        }
+
+        assignmentRepos.updateAssignment(assignment.id) {
+            deadline = Clock.System.now().plus(60.minutes)
+            statusChangedAt = Clock.System.now()
+        }
     }
 }

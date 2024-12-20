@@ -1,11 +1,10 @@
 package ac.osaka_u.ics.pbl
 
 import ac.osaka_u.ics.pbl.handler.AssignmentsHandler
-import ac.osaka_u.ics.pbl.handler.SampleHandler
+import ac.osaka_u.ics.pbl.handler.QueueHandler
 import ac.osaka_u.ics.pbl.handler.TasksHandler
-import ac.osaka_u.ics.pbl.model.Memo
 import ac.osaka_u.ics.pbl.model.PostGeneratorRequest
-import ac.osaka_u.ics.pbl.model.*
+import ac.osaka_u.ics.pbl.model.TaskRequest
 import io.ktor.http.*
 import io.ktor.resources.*
 import io.ktor.server.application.*
@@ -16,54 +15,6 @@ import io.ktor.server.resources.post
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.koin.ktor.ext.inject
-
-import java.util.concurrent.ConcurrentLinkedQueue
-
-val taskQueue = ConcurrentLinkedQueue<Task>()
-val assignedTasks = mutableMapOf<String, Task>()
-
-//@Resource("/assignments")
-//class SampleResource{
-//    @Resource("next")
-//    class NextResponse(val parent: SampleResource = SampleResource()) {
-//    @Resource("{id}")
-//        class MemoId(val parent: Memos = Memos(), val id: Int)
-//    }
-//}
-
-@Resource("/assignments")
-class AssignmentResource {
-    @Resource("next")
-    class Next(val parent: AssignmentResource = AssignmentResource())
-
-    @Resource("{id}/refresh")
-    class Refresh(val id: String, val parent: AssignmentResource = AssignmentResource())
-
-    @Resource("{id}/register")
-    class Register(val id: String, val parent: AssignmentResource = AssignmentResource())
-}
-
-
-//fun Application.configureRouting() {
-//    val sampleHandler = SampleHandler()
-//    routing {
-//        get<SampleResource> {
-//            call.respond(sampleHandler.handleGet())
-//        }
-//        get<SampleResource.NextResponse> {
-//            call.respond(sampleHandler.handleGetMemos())
-//        }
-//        get<SampleResource.Memos.MemoId> { memoId ->
-//            call.respond(sampleHandler.handleGetMemo(memoId.id))
-//        }
-//        post<SampleResource.Memos> {
-//            val memo = call.receive<Memo>()
-//            sampleHandler.handlePostMemo(memo)
-//            call.respond(HttpStatusCode.Created)
-//        }
-//
-//    }
-
 
 @Resource("/tasks")
 class TaskResource{
@@ -76,12 +27,54 @@ class TaskResource{
     }
 }
 
+@Resource("/assignments")
+class AssignmentsResource{
+    @Resource("next")
+    class Next(val parent: AssignmentsResource = AssignmentsResource())
+    @Resource("{id}")
+    class AssignmentId(val parent: AssignmentsResource = AssignmentsResource(), val id: String){
+        @Resource("register")
+        class Register(val parent: AssignmentId)
+        @Resource("refresh")
+        class Refresh(val parent: AssignmentId)
+    }
+}
+
+@Resource("/queue")
+class QueueResource
+
 fun Application.configureRouting() {
-    val sampleHandler = SampleHandler()
-    val tasksHandler by inject<TasksHandler>()
     val assignmentsHandler by inject<AssignmentsHandler>()
+    val queueHandler by inject<QueueHandler>()
+    val tasksHandler by inject<TasksHandler>()
     routing {
         authenticate {
+            get<AssignmentsResource.Next> {
+                val clientId = call.principal<UserIdPrincipal>()!!.name
+                val res = assignmentsHandler.handleGetNextAssignment(clientId)
+                if (res != null) {
+                    call.respond(res)
+                } else {
+                    call.respond(HttpStatusCode.NoContent)
+                }
+            }
+            post<AssignmentsResource.AssignmentId.Register> { assignmentId ->
+                val clientId = call.principal<UserIdPrincipal>()!!.name
+                call.respond(assignmentsHandler.handleRegisterAssignment(assignmentId.parent.id, clientId))
+            }
+            post<AssignmentsResource.AssignmentId.Refresh> { assignmentId ->
+                val clientId = call.principal<UserIdPrincipal>()!!.name
+                call.respond(assignmentsHandler.handleRefreshAssignment(assignmentId.parent.id, clientId))
+            }
+
+            get<QueueResource> {
+                call.respond(queueHandler.handleGetAll())
+            }
+            post<QueueResource> {
+                val request = call.receive<TaskRequest>()
+                call.respond(queueHandler.handlePost(request))
+            }
+
             get<TaskResource> {
                 call.respond(tasksHandler.handleGetTasks())
             }
@@ -104,75 +97,5 @@ fun Application.configureRouting() {
                 call.respond(HttpStatusCode.NoContent)
             }
         }
-
-        // /assignments/next
-        get<AssignmentResource.Next> {
-            val userId = call.request.queryParameters["user_id"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing user_id")
-            call.respond(assignmentsHandler.assignmentNext(userId))
-            val clientId = call.principal<UserIdPrincipal>()!!.name
-        }
-
-        // /assignments/{id}/refresh
-        get<AssignmentResource.Refresh> { params ->
-            val taskId = params.id
-            val userId = call.request.queryParameters["user_id"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing user_id")
-
-            val task = assignedTasks[taskId]
-            if (task == null) {
-                call.respond(HttpStatusCode.NotFound, "Task not found")
-            } else if (!isTaskAssignedToUser(taskId, userId)) {
-                call.respond(HttpStatusCode.Forbidden, "Task not assigned to this user")
-            } else if (!isTaskValid(task)) {
-                call.respond(HttpStatusCode.Forbidden, "Task is no longer valid")
-            } else {
-                assignedTasks[taskId] = task.copy(completed = true)
-                call.respond(task)
-            }
-        }
-
-        // /assignments/{id}/register
-        post<AssignmentResource.Register> { params ->
-            val taskId = params.id
-            val userId = call.request.queryParameters["user_id"] ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing user_id")
-
-            val task = assignedTasks[taskId]
-            if (task == null) {
-                call.respond(HttpStatusCode.NotFound, "Task not found")
-            } else if (!isTaskAssignedToUser(taskId, userId)) {
-                call.respond(HttpStatusCode.Forbidden, "Task not assigned to this user")
-            } else if (!isTaskValid(task)) {
-                call.respond(HttpStatusCode.Forbidden, "Task is no longer valid")
-            } else {
-                saveModelFile(task)
-                call.respond(HttpStatusCode.OK, "Task registered successfully")
-            }
-        }
     }
 }
-
-
-    fun isTaskAssignedToUser(taskId: String, userId: String): Boolean {
-        return assignedTasks[taskId]?.id == taskId
-    }
-
-
-    fun isTaskValid(task: Task): Boolean {
-        // 示例逻辑：仅检查任务未完成状态
-        return !task.completed
-    }
-
-
-    fun generateTask(): Task? {
-        return Task(
-            id = System.currentTimeMillis().toString(),
-            completed = false,
-            base_model_id = "base123",
-            type = "type1",
-            parameter = Parameter1(player_id = "player1", game_id = listOf("game1", "game2"))
-        )
-    }
-
-    fun saveModelFile(task: Task) {
-        println("Saving model file for task: ${task.id}")
-    }
-
