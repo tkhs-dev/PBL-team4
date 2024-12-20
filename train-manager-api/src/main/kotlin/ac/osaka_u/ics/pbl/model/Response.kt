@@ -23,11 +23,13 @@ fun Assignment.toNextResponse() = NextResponse(
     task = task.toResponse()
 )
 
+@Serializable
 data class RefreshResponse(
     val id: String,
     val deadline: Long
 )
 
+@Serializable
 data class ModelResponse(
     val id: String,
     val version: Int,
