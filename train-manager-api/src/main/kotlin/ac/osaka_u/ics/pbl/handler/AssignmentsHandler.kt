@@ -45,15 +45,12 @@ class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, priv
 
         // タスクを処理中にする
         return assignmentRepos.createAssignment(
-            Assignment(
-                id = UUID.randomUUID(),
-                assignedAt = Clock.System.now(),
-                clientId = id,
-                deadline = Clock.System.now().plus(60.minutes),
-                status = AssignmentStatus.PROCESSING,
-                statusChangedAt = Clock.System.now(),
-                task = task
-            )
+            assignedAt = Clock.System.now(),
+            clientId = id,
+            deadline = Clock.System.now().plus(60.minutes),
+            status = AssignmentStatus.PROCESSING,
+            statusChangedAt = Clock.System.now(),
+            taskId = task.id
         ).toNextResponse()
     }
 

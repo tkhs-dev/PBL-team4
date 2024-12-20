@@ -5,9 +5,10 @@ import ac.osaka_u.ics.pbl.data.dao.Assignments
 import ac.osaka_u.ics.pbl.data.dao.Clients
 import ac.osaka_u.ics.pbl.data.dao.Tasks
 import ac.osaka_u.ics.pbl.data.entity.AssignmentEntity
-import ac.osaka_u.ics.pbl.data.entity.toEntity
+import ac.osaka_u.ics.pbl.data.entity.TaskEntity
 import ac.osaka_u.ics.pbl.data.entity.toModel
 import ac.osaka_u.ics.pbl.domain.model.Assignment
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -27,7 +28,14 @@ interface AssignmentRepository {
     fun findAssignmentById(id: UUID): Assignment?
     fun findAssignmentByUserId(userId: Int): List<Assignment>
     fun findAssignments(): List<Assignment>
-    fun createAssignment(assignment: Assignment): Assignment
+    fun createAssignment(
+        assignedAt: Instant,
+        clientId: Int,
+        deadline: Instant,
+        status: AssignmentStatus,
+        statusChangedAt: Instant,
+        taskId: UUID
+    ): Assignment
     fun updateAssignment(id: UUID, update: AssignmentUpdateBuilder.() -> Unit): Assignment?
     fun deleteAssignment(assignment: Assignment)
 }
@@ -51,9 +59,23 @@ class AssignmentRepositoryImpl : AssignmentRepository {
         }
     }
 
-    override fun createAssignment(assignment: Assignment): Assignment {
+    override fun createAssignment(
+        assignedAt: Instant,
+        clientId: Int,
+        deadline: Instant,
+        status: AssignmentStatus,
+        statusChangedAt: Instant,
+        taskId: UUID
+    ): Assignment {
         return transaction {
-            assignment.toEntity().toModel()
+            AssignmentEntity.new {
+                this.assignedAt = assignedAt
+                this.client = EntityID(clientId, Clients)
+                this.deadline = deadline
+                this.status = status
+                this.statusChangedAt = statusChangedAt
+                this.task = TaskEntity[taskId]
+            }.toModel()
         }
     }
 
