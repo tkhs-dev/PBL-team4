@@ -81,7 +81,7 @@ class Trainer:
 
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        epoch = task['parameters']['epochs']
+        epoch = int(task['parameters']['epochs'])
 
         #学習ループ
         for e in range(epoch):
@@ -113,7 +113,7 @@ class Trainer:
             self.cancel = True
             self.logger.debug(f"Failed to refresh assignment({assignment_id}). Task is canceled.")
             return
-        deadline = datetime.fromtimestamp(resp['deadline'])
+        deadline = datetime.fromtimestamp(resp['deadline']/1000)
 
         #タイマーを再設定
         self.timer.cancel()
@@ -141,7 +141,7 @@ class Trainer:
 
             assignment_id = assignment['id']
             task = assignment['task']
-            deadline = datetime.fromtimestamp(assignment['deadline'])
+            deadline = datetime.fromtimestamp(assignment['deadline']/1000)
 
             self.logger.info(f"Received assignment({assignment_id}) [deadline:{deadline}]",)
             self.logger.info(f"Start training for {task}")
@@ -155,14 +155,14 @@ class Trainer:
                 self.timer.start()
 
                 #ベースモデルが指定されている場合はロード, 指定されていない新規作成
-                if task['base_model_id'] is None:
+                if task['baseModelId'] is None:
                     model = EvaluatorModel()
                 else:
-                    model = self.load_model(task['base_model_id'])
+                    model = self.load_model(task['baseModelId'])
                     if model is None:
-                        raise Exception(f"Failed to load model({task['base_model_id']})")
+                        raise Exception(f"Failed to load model({task['baseModelId']})")
 
-                if task['type'] == 'supervised': #教師あり学習
+                if task['type'] == 'SUPERVISED': #教師あり学習
                     result = self.task_supervised(model, task)
                     if not self.cancel:
                         self.api_client.submit_model(assignment_id, int(datetime.now().timestamp()), result)
