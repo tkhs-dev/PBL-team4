@@ -2,7 +2,6 @@ package ac.osaka_u.ics.pbl.handler
 
 import ac.osaka_u.ics.pbl.ApiException
 import ac.osaka_u.ics.pbl.common.AssignmentStatus
-import ac.osaka_u.ics.pbl.domain.model.Assignment
 import ac.osaka_u.ics.pbl.domain.model.Model
 import ac.osaka_u.ics.pbl.domain.model.Task
 import ac.osaka_u.ics.pbl.domain.repos.AssignmentRepository
@@ -38,6 +37,14 @@ class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, priv
                 }else{
                     return it.toNextResponse()
                 }
+            }
+
+        assignmentRepos.findAssignmentsShouldBeTimeout()
+            .forEach {
+                assignmentRepos.updateAssignment(it.id){
+                    status = AssignmentStatus.TIMEOUT
+                }
+                queueRepository.enqueue(it.task.id)
             }
 
         // キューからタスクを取得

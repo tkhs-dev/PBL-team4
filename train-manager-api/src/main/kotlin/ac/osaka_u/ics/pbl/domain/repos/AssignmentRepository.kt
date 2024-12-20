@@ -27,6 +27,7 @@ class AssignmentUpdateBuilder{
 interface AssignmentRepository {
     fun findAssignmentById(id: UUID): Assignment?
     fun findAssignmentByUserId(userId: Int): List<Assignment>
+    fun findAssignmentsShouldBeTimeout(): List<Assignment>
     fun findAssignments(): List<Assignment>
     fun createAssignment(
         assignedAt: Instant,
@@ -50,6 +51,12 @@ class AssignmentRepositoryImpl : AssignmentRepository {
     override fun findAssignmentByUserId(userId: Int): List<Assignment> {
         return transaction {
             AssignmentEntity.find { Assignments.client eq userId }.map { it.toModel() }
+        }
+    }
+
+    override fun findAssignmentsShouldBeTimeout(): List<Assignment> {
+        return transaction {
+            AssignmentEntity.find { Assignments.deadline less Clock.System.now() }.map { it.toModel() }
         }
     }
 
