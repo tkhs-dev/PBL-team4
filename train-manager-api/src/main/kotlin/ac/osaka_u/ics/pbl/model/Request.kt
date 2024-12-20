@@ -21,3 +21,8 @@ data class TaskRequest(
     @Serializable(with = ParameterMapSerializer::class)
     val parameters: Map<String,@Contextual Any>
 )
+
+@Serializable
+data class ClientRequest(
+    val user: String
+)

@@ -1,10 +1,7 @@
 package ac.osaka_u.ics.pbl.model
 
 import ac.osaka_u.ics.pbl.common.ParameterMapSerializer
-import ac.osaka_u.ics.pbl.domain.model.Assignment
-import ac.osaka_u.ics.pbl.domain.model.Model
-import ac.osaka_u.ics.pbl.domain.model.Task
-import ac.osaka_u.ics.pbl.domain.model.TaskGenerator
+import ac.osaka_u.ics.pbl.domain.model.*
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
@@ -84,6 +81,17 @@ fun TaskGenerator.toResponse() = TaskGeneratorResponse(
     type = type.name,
     weight = weight,
     parameters = parameters
+)
+
+@Serializable
+data class ClientResponse(
+    val id: Int,
+    val secret: String
+)
+
+fun Client.toResponse() = ClientResponse(
+    id = id,
+    secret = secret
 )
 
 

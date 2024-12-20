@@ -16,6 +16,10 @@ from duel.sneak.duel_evaluator import EvaluatorModel
 
 class ApiClient(metaclass=abc.ABCMeta):
     @abc.abstractmethod
+    def register_client(self, name: str) -> Dict | None:
+        pass
+
+    @abc.abstractmethod
     def get_assignment(self) -> Dict | None:
         pass
 
@@ -37,6 +41,12 @@ class ApiClientImpl(ApiClient):
         self.secret_key = secret_key
         self.headers = {'Authorization': f'Bearer {self.secret_key}'}
         self.counter = 0
+
+    def register_client(self, name: str) -> Dict | None:
+        response = self._post('clients', {"user":name})
+        response.raise_for_status()
+        return response.json()
+
 
     def get_assignment(self) -> Dict | None:
         response = self._get('assignments/next')

@@ -1,8 +1,10 @@
 package ac.osaka_u.ics.pbl
 
 import ac.osaka_u.ics.pbl.handler.AssignmentsHandler
+import ac.osaka_u.ics.pbl.handler.ClientsHandler
 import ac.osaka_u.ics.pbl.handler.QueueHandler
 import ac.osaka_u.ics.pbl.handler.TasksHandler
+import ac.osaka_u.ics.pbl.model.ClientRequest
 import ac.osaka_u.ics.pbl.model.PostGeneratorRequest
 import ac.osaka_u.ics.pbl.model.TaskRequest
 import io.ktor.http.*
@@ -43,10 +45,14 @@ class AssignmentsResource{
 @Resource("/queue")
 class QueueResource
 
+@Resource("/clients")
+class ClientsResource
+
 fun Application.configureRouting() {
     val assignmentsHandler by inject<AssignmentsHandler>()
     val queueHandler by inject<QueueHandler>()
     val tasksHandler by inject<TasksHandler>()
+    val clientsHandler by inject<ClientsHandler>()
     routing {
         authenticate {
             get<AssignmentsResource.Next> {
@@ -96,6 +102,11 @@ fun Application.configureRouting() {
                 tasksHandler.handleDeleteGenerator(generatorId.id)
                 call.respond(HttpStatusCode.NoContent)
             }
+        }
+        post<ClientsResource> {
+            val request = call.receive<ClientRequest>()
+            val clientId = clientsHandler.handleRegisterNewClient(request)
+            call.respond(HttpStatusCode.Created, clientId)
         }
     }
 }

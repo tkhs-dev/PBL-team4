@@ -180,10 +180,18 @@ def train():
     ch.setFormatter(Formatter('[%(asctime)s %(levelname)s] %(message)s'))
     logger.setLevel(lvl)
     logger.addHandler(ch)
+    with open("./user.txt") as f:
+        s = f.read()
+    if not s:
+        logger.error("user.txt is empty. Please create user.txt at the same directory as this script and write your user name.")
+        return
+
     with open("./secret.txt") as f:
         s = f.read()
     if not s:
-        raise Exception("secret.txt is empty")
+        logger.info("secret.txt is empty. Register this client to the server.")
+
+        return
     logger.debug("Loaded secret key")
     api_client = ApiClientImpl(api_url='http://localhost:8080', secret_key=s)
     # api_client = TestApiClient()

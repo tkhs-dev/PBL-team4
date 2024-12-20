@@ -1,9 +1,7 @@
 package ac.osaka_u.ics.pbl
 
 import ac.osaka_u.ics.pbl.domain.repos.*
-import ac.osaka_u.ics.pbl.handler.AssignmentsHandler
-import ac.osaka_u.ics.pbl.handler.QueueHandler
-import ac.osaka_u.ics.pbl.handler.TasksHandler
+import ac.osaka_u.ics.pbl.handler.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
@@ -54,6 +52,7 @@ val module = module {
     singleOf(::TasksHandler)
     singleOf(::AssignmentsHandler)
     singleOf(::QueueHandler)
+    singleOf(::ClientsHandler)
 }
 
 val Application.debug: Boolean

@@ -10,7 +10,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 interface ClientRepository {
     fun findClientById(id: Int): Client?
     fun findClientBySecret(secret: String): Client?
-    fun createClient(client: Client): Client
+    fun createClient(secret: String, user: String): Client
 }
 
 class ClientRepositoryImpl : ClientRepository {
@@ -30,9 +30,14 @@ class ClientRepositoryImpl : ClientRepository {
         }
     }
 
-    override fun createClient(client: Client): Client {
+    override fun createClient(secret: String, user: String): Client {
         return transaction{
-            client.toEntity().toModel()
+            val client = ClientEntity.new {
+                this.secret = secret
+                this.user = user
+            }.toModel()
+            cache[secret] = client.id
+            client
         }
     }
 }

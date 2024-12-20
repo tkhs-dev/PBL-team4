@@ -10,13 +10,10 @@ class ClientEntity(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<ClientEntity>(Clients)
 
     var secret by Clients.secret
+    var user by Clients.user
 }
 
 fun ClientEntity.toModel() = Client(
     id = id.value,
     secret = secret
 )
-
-fun Client.toEntity() = ClientEntity.new {
-    secret = this@toEntity.secret
-}
