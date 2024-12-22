@@ -8,7 +8,7 @@ class TurnResult(Enum):
     LOSE = 2
     DRAW = 3
 
-class Direction(Enum):
+class Direction(str,Enum):
     UP = "up"
     DOWN = "down"
     LEFT = "left"

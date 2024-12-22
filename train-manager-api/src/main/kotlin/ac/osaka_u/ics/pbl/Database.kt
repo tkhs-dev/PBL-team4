@@ -16,6 +16,6 @@ fun Application.configureDatabase(){
     })
     transaction {
         log.info("DB CONNECTION SUCCESSFUL")
-        SchemaUtils.createMissingTablesAndColumns(Clients, Tasks, Models, Assignments, TaskGenerators)
+        SchemaUtils.createMissingTablesAndColumns(Clients, Tasks, Models, Assignments, TaskGenerators, Errors)
     }
 }

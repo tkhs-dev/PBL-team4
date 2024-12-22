@@ -5,3 +5,4 @@ ktor:
   deployment:
     port: 8080
     debug: true
+    staticRoot: "C:\\Users\\tokuh\\Desktop\\models"

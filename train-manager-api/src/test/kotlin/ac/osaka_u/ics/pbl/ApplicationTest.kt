@@ -1,5 +1,6 @@
 package ac.osaka_u.ics.pbl
 
+import ac.osaka_u.ics.pbl.common.LeaderboardApi
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

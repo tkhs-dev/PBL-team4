@@ -1,6 +1,7 @@
 package ac.osaka_u.ics.pbl.model
 
 import ac.osaka_u.ics.pbl.common.ParameterMapSerializer
+import ac.osaka_u.ics.pbl.common.TaskStatus
 import ac.osaka_u.ics.pbl.domain.model.*
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
@@ -50,7 +51,7 @@ fun Model.toResponse() = ModelResponse(
 @Serializable
 data class TaskResponse(
     val id: String,
-    val completed: Boolean,
+    val status: TaskStatus,
     val baseModelId: String?,
     val type: String,
     @Serializable(with = ParameterMapSerializer::class)
@@ -59,7 +60,7 @@ data class TaskResponse(
 
 fun Task.toResponse() = TaskResponse(
     id = id.toString(),
-    completed = completed,
+    status = status,
     baseModelId = baseModelId?.toString(),
     type = type.name,
     parameters = parameter

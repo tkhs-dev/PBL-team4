@@ -15,15 +15,7 @@ class TaskGeneratorEntity(id: EntityID<Int>) : IntEntity(id) {
     var type by TaskGenerators.type
     var weight by TaskGenerators.weight
 
-    var parameters: Map<String, Any>
-        get(){
-            val jsonString = TaskGenerators.parameters.getValue(this, TaskGeneratorEntity::parameters)
-            return Json.decodeFromString(ParameterMapSerializer, jsonString)
-        }
-        set(value) {
-            val obj = Json.encodeToString(ParameterMapSerializer, value)
-            TaskGenerators.parameters.setValue(this, TaskGeneratorEntity::parameters, obj)
-        }
+    var parameters by TaskGenerators.parameters
 }
 
 fun TaskGeneratorEntity.toModel() = TaskGenerator(

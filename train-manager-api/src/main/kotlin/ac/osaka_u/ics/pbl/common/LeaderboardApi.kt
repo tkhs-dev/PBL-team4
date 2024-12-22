@@ -16,9 +16,24 @@ class LeaderboardApi {
             }
         }
 
+        fun playerExists(playerId: String): Boolean {
+            return runBlocking {
+                try {
+                    Jsoup.connect("$BASE_URL/$playerId/stats").get()
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+        }
+
         fun getPlayerGames(playerId: String, limit: Int = 100, resultQuery: Set<GameResult> = setOf(GameResult.WIN)): List<PlayerGame> {
             return runBlocking {
-                val doc = Jsoup.connect("$BASE_URL/$playerId/stats").get()
+                val doc = try{
+                    Jsoup.connect("$BASE_URL/$playerId/stats").get()
+                }catch (e: Exception){
+                    return@runBlocking emptyList<PlayerGame>()
+                }
                 val table = doc.selectXpath("""/html/body/div[1]/div/main/div[2]/table/tbody/tr""")
                 table.drop(0).map {
                     val tds = it.select("td")

@@ -18,7 +18,6 @@ class GameDownloader:
         return obj
 
     def _on_open(self, ws):
-        print("WebSocket connection opened")
         self.result = []
 
     def _on_message(self, ws, message):
@@ -66,7 +65,7 @@ class GameDownloader:
         print("WebSocket error:", error)
 
     def _on_close(self, ws, close_status_code, close_msg):
-        print("WebSocket connection closed")
+        pass
 
     def _run_websocket(self):
         ws = websocket.WebSocketApp(self.url,

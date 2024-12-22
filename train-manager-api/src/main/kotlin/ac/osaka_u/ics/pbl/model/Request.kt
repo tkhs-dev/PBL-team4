@@ -6,6 +6,17 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class AssignmentRegisterRequest(
+    val completedAt: Long,
+)
+
+@Serializable
+data class AssignmentErrorRequest(
+    val stackTrace: String,
+    val clientVersion: String
+)
+
+@Serializable
 data class PostGeneratorRequest(
     val name: String,
     val type: TaskType,

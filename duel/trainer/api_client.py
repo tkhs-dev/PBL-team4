@@ -32,7 +32,11 @@ class ApiClient(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_model(self, model_id: str) -> EvaluatorModel | None:
+    def post_error(self, assignment_id: str, error: str, client_version: str) -> Dict | None:
+        pass
+
+    @abc.abstractmethod
+    def get_model_bytes(self, model_id: str) -> bytes | None:
         pass
 
 class ApiClientImpl(ApiClient):
@@ -67,15 +71,26 @@ class ApiClientImpl(ApiClient):
             'completedAt': completed_at
         }
         files = {
-            'json': ('json_data', json.dumps(data), 'application/json'),
+            'json': (None, json.dumps(data), 'application/json'),
             'binary': ('binary_file', model_binary, 'application/octet-stream')
         }
         response = requests.post(f'{self.url}/assignments/{assignment_id}/register', files=files, headers=self.headers)
         response.raise_for_status()
         return response.json()
 
-    def get_model(self, model_id: str) -> EvaluatorModel | None:
-        pass
+    def post_error(self, assignment_id: str, error: str, client_version: str) -> Dict | None:
+        data = {
+            'stackTrace': error,
+            'clientVersion': client_version
+        }
+        response = self._post(f'assignments/{assignment_id}/error', data)
+        response.raise_for_status()
+        return response.json()
+
+    def get_model_bytes(self, model_id: str) -> bytes | None:
+        data = requests.get(f'{self.url}/static/models/{model_id}', headers=self.headers)
+        data.raise_for_status()
+        return data.content
 
     def _get(self, endpoint: str) -> Response:
         return requests.get(f'{self.url}/{endpoint}', headers=self.headers)

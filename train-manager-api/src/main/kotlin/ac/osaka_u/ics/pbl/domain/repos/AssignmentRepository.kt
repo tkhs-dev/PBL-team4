@@ -11,6 +11,7 @@ import ac.osaka_u.ics.pbl.domain.model.Assignment
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.util.*
@@ -27,6 +28,7 @@ class AssignmentUpdateBuilder{
 interface AssignmentRepository {
     fun findAssignmentById(id: UUID): Assignment?
     fun findAssignmentByUserId(userId: Int): List<Assignment>
+    fun findProcessingAssignmentsByUserId(userId: Int): List<Assignment>
     fun findAssignmentsShouldBeTimeout(): List<Assignment>
     fun findAssignments(): List<Assignment>
     fun createAssignment(
@@ -54,9 +56,15 @@ class AssignmentRepositoryImpl : AssignmentRepository {
         }
     }
 
+    override fun findProcessingAssignmentsByUserId(userId: Int): List<Assignment> {
+        return transaction {
+            AssignmentEntity.find { (Assignments.client eq userId) and (Assignments.status eq AssignmentStatus.PROCESSING) }.map { it.toModel() }
+        }
+    }
+
     override fun findAssignmentsShouldBeTimeout(): List<Assignment> {
         return transaction {
-            AssignmentEntity.find { Assignments.deadline less Clock.System.now() }.map { it.toModel() }
+            AssignmentEntity.find { Assignments.deadline less Clock.System.now() and (Assignments.status eq AssignmentStatus.PROCESSING) }.map { it.toModel() }
         }
     }
 

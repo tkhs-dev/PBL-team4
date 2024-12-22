@@ -4,3 +4,4 @@ torch
 deap
 numpy
 websocket-client
+early-stopping-pytorch

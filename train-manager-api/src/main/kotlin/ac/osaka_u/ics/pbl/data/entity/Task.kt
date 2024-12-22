@@ -13,32 +13,29 @@ import java.util.*
 class TaskEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     companion object : UUIDEntityClass<TaskEntity>(Tasks)
 
-    var completed by Tasks.completed
+    var status by Tasks.status
+    var errorCount by Tasks.errorCount
     var baseModelId by Tasks.baseModelId
     var type by Tasks.type
-
-    var parameters: Map<String, Any>
-        get(){
-            val jsonString = Tasks.parameters.getValue(this, TaskEntity::parameters)
-            return Json.decodeFromString(ParameterMapSerializer, jsonString)
-        }
-        set(value) {
-            val obj = Json.encodeToString(ParameterMapSerializer, value)
-            Tasks.parameters.setValue(this, TaskEntity::parameters, obj)
-        }
+    var createdAt by Tasks.createdAt
+    var parameters by Tasks.parameters
 }
 
 fun TaskEntity.toModel() = Task(
     id = id.value,
-    completed = completed,
+    errorCount = errorCount,
+    status = status,
     baseModelId = baseModelId?.value,
     type = type,
+    createdAt = createdAt,
     parameter = parameters
 )
 
 fun Task.toEntity() = TaskEntity.new(id) {
-    completed = this@toEntity.completed
+    status = this@toEntity.status
+    errorCount = this@toEntity.errorCount
     baseModelId = this@toEntity.baseModelId?.let { EntityID(it, Models) }
     type = this@toEntity.type
+    createdAt = this@toEntity.createdAt
     parameters = this@toEntity.parameter
 }

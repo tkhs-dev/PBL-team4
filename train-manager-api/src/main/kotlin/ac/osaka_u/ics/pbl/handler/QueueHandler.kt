@@ -1,5 +1,6 @@
 package ac.osaka_u.ics.pbl.handler
 
+import ac.osaka_u.ics.pbl.common.TaskStatus
 import ac.osaka_u.ics.pbl.domain.model.Task
 import ac.osaka_u.ics.pbl.domain.repos.QueueRepository
 import ac.osaka_u.ics.pbl.domain.repos.TaskRepository
@@ -7,6 +8,7 @@ import ac.osaka_u.ics.pbl.model.TaskRequest
 import ac.osaka_u.ics.pbl.model.TaskResponse
 import ac.osaka_u.ics.pbl.model.toResponse
 import io.ktor.server.plugins.*
+import kotlinx.datetime.Clock
 import java.util.*
 
 class QueueHandler(private val queueRepository: QueueRepository, private val taskRepository: TaskRepository) {
@@ -29,9 +31,11 @@ class QueueHandler(private val queueRepository: QueueRepository, private val tas
         val task = taskRepository.createTask(
             Task(
                 id = UUID.randomUUID(),
-                completed = false,
+                status = TaskStatus.WAITING,
+                errorCount = 0,
                 baseModelId = baseUid,
                 type = request.type,
+                createdAt = Clock.System.now(),
                 parameter = request.parameters
             )
         )

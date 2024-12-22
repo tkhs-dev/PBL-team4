@@ -1,6 +1,5 @@
 package ac.osaka_u.ics.pbl.handler
 
-import ac.osaka_u.ics.pbl.domain.model.Client
 import ac.osaka_u.ics.pbl.domain.repos.ClientRepository
 import ac.osaka_u.ics.pbl.model.ClientRequest
 import ac.osaka_u.ics.pbl.model.ClientResponse

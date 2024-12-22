@@ -34,7 +34,19 @@ fun Application.module() {
 fun Application.configureDI() {
     install(Koin) {
         slf4jLogger()
-        modules(module)
+        modules(module {
+            singleOf(::TaskRepositoryImpl){bind<TaskRepository>()}
+            singleOf(::TaskGeneratorRepositoryImpl){bind<TaskGeneratorRepository>()}
+            singleOf(::AssignmentRepositoryImpl){bind<AssignmentRepository>()}
+            singleOf(::QueueRepositoryImpl){bind<QueueRepository>()}
+            single{ModelRepositoryImpl(this@configureDI.staticRoot) as ModelRepository}
+            singleOf(::ErrorRepositoryImpl){bind<ErrorRepository>()}
+            singleOf(::ClientRepositoryImpl){bind<ClientRepository>()}
+            singleOf(::TasksHandler)
+            singleOf(::AssignmentsHandler)
+            singleOf(::QueueHandler)
+            singleOf(::ClientsHandler)
+        })
     }
 }
 
@@ -42,18 +54,8 @@ fun Application.onDebug(block: Application.() -> Unit) {
     if (debug) block()
 }
 
-val module = module {
-    singleOf(::TaskRepositoryImpl){bind<TaskRepository>()}
-    singleOf(::TaskGeneratorRepositoryImpl){bind<TaskGeneratorRepository>()}
-    singleOf(::AssignmentRepositoryImpl){bind<AssignmentRepository>()}
-    singleOf(::QueueRepositoryImpl){bind<QueueRepository>()}
-    singleOf(::ModelRepositoryImpl){bind<ModelRepository>()}
-    singleOf(::ClientRepositoryImpl){bind<ClientRepository>()}
-    singleOf(::TasksHandler)
-    singleOf(::AssignmentsHandler)
-    singleOf(::QueueHandler)
-    singleOf(::ClientsHandler)
-}
+val Application.staticRoot: String
+    get() = environment.config.propertyOrNull("ktor.deployment.staticRoot")?.getString() ?: "./static"
 
 val Application.debug: Boolean
     get() = environment.config.propertyOrNull("ktor.deployment.debug")?.getString()?.toBoolean() ?: false

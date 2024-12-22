@@ -4,18 +4,24 @@ import sys
 import threading
 import os
 import io
+import traceback
 from datetime import datetime
 from time import sleep
 
 from logging import getLogger, DEBUG, StreamHandler, Formatter
 
 import torch
+from early_stopping_pytorch import EarlyStopping
 from torch.utils.data import Dataset
 
 from api_client import TestApiClient, ApiClientImpl
 from duel.sneak.duel_evaluator import Evaluator, EvaluatorModel
+from duel.trainer.common import file_exists_and_not_empty, get_version_str
 from game_downloader import GameDownloader
 from shared.rule import Direction
+
+version = "1.0.0"
+version_str = get_version_str(version)
 
 # ニューラルネットワークの学習用データセット
 class DuelDataset(Dataset):
@@ -53,38 +59,58 @@ class Trainer:
         sys.exit(1)
 
     #モデルをロードする. キャッシュがあればそれを使う.
-    def load_model(self, model_id: str) -> EvaluatorModel | None:
+    def load_model(self, model_id: str):
         #キャッシュフォルダを検索
-        if os.path.exists(f"./cache/{model_id}.pt"):
-            model = EvaluatorModel()
-            model.load(f"./cache/{model_id}.pt")
-            return model
+        if not os.path.exists("./cache"):
+            os.makedirs("./cache")
+        if not os.path.exists(f"./cache/{model_id}"):
+            data = self.api_client.get_model_bytes(model_id)
+            if data is None:
+                self.logger.error(f"Failed to get model({model_id})")
+                return None
+            with open(f"./cache/{model_id}", "wb") as f:
+                f.write(data)
+        data = torch.load(f"./cache/{model_id}", map_location=self.device, weights_only=True)
+        model = EvaluatorModel()
+        model.load_state_dict(data['model'])
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        optimizer.load_state_dict(data['optimizer'])
+        return model,optimizer
 
-        model = self.api_client.get_model(model_id)
-        if model is None:
-            self.logger.error(f"Failed to get model({model_id})")
-            return None
-        model.save(f"./cache/{model_id}.pt") #キャッシュに保存
-        return model
-
-    def task_supervised(self, base_model:EvaluatorModel, task, batch_size = 32) -> bytes | None:
+    def task_supervised(self, base_model:EvaluatorModel, optimizer:torch.optim.Adam, task, batch_size = 64) -> bytes | None:
         print("Supervised training started")
         games = task['parameters']['games']
         downloader = GameDownloader()
         datas = []
         for game in games:
+            if file_exists_and_not_empty(f"./cache/games/{game}.json"):
+                with open(f"./cache/games/{game}.json", "r") as f:
+                    data= json.load(f)
+            else:
+                data = downloader.download_data(game,task['parameters']['player_id'])
+                with open(f"./cache/games/{game}.json", "w") as f:
+                    f.write(json.dumps(data))
             #すべてのゲームについてデータをダウンロードし, 最後のターン以外をdatasに追加
-            datas += downloader.download_data(game,task['parameters']['player_id'])[:-1]
+            datas += data[:-1]
 
         dataset = DuelDataset(datas)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
         model = base_model.to(self.device)
 
+        if not optimizer:
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+        if torch.cuda.is_available():
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to('cuda')
+
         criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         epoch = int(task['parameters']['epochs'])
 
         #学習ループ
+        early_stopping = EarlyStopping(patience=11, verbose=False)
         for e in range(epoch):
             if self.cancel:
                 return None
@@ -98,12 +124,18 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-
+            early_stopping(total_loss/len(dataloader), model)
+            if early_stopping.early_stop:
+                self.logger.debug(f"Early stopping at epoch {e+1}/{epoch}")
+                break
             self.logger.debug(f"Epoch {e+1}/{epoch} Loss: {total_loss/len(dataloader)}")
         #学習結果をバイナリに変換して返す
         model.eval()
         buffer = io.BytesIO()
-        torch.save(model.state_dict(), buffer)
+        torch.save({
+            'model': model.state_dict(),
+            'optimizer': optimizer.state_dict()
+        }, buffer)
         return buffer.getvalue()
 
     #期限が近いた時に呼ばれるコールバック
@@ -126,6 +158,9 @@ class Trainer:
     def start(self, api_client):
         self.api_client = api_client
         signal.signal(signal.SIGINT, self.sig_handler) #シグナルハンドラを設定
+
+        if not os.path.exists("./cache/games"):
+            os.makedirs("./cache/games")
 
         self.logger.debug(f"Start training on device {self.device}")
 
@@ -158,23 +193,25 @@ class Trainer:
                 #ベースモデルが指定されている場合はロード, 指定されていない新規作成
                 if task['baseModelId'] is None:
                     model = EvaluatorModel()
+                    optimizer = None
                 else:
-                    model = self.load_model(task['baseModelId'])
+                    model,optimizer = self.load_model(task['baseModelId'])
                     if model is None:
                         raise Exception(f"Failed to load model({task['baseModelId']})")
 
                 if task['type'] == 'SUPERVISED': #教師あり学習
-                    result = self.task_supervised(model, task)
+                    result = self.task_supervised(model, optimizer,task)
                     if not self.cancel:
                         self.api_client.submit_model(assignment_id, int(datetime.now().timestamp()), result)
                 else:
                     raise Exception("Unknown task", task)
+            except Exception as e:
+                print(traceback.format_exc())
+                self.logger.error(f"Error occurred during training: {e}")
+                self.api_client.post_error(assignment_id, str(e), version_str)
             finally:
                 self.logger.debug("Timer canceled")
                 self.timer.cancel()
-
-def file_exists_and_not_empty(file_path: str) -> bool:
-    return os.path.exists(file_path) and os.stat(file_path).st_size != 0
 
 def train():
     #APIのURLを設定
