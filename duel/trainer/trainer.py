@@ -18,7 +18,8 @@ from api_client import TestApiClient, ApiClientImpl
 from duel.sneak.duel_evaluator import Evaluator, EvaluatorModel
 from duel.trainer.common import file_exists_and_not_empty, get_version_str
 from game_downloader import GameDownloader
-from shared.rule import Direction
+from shared import rule
+from shared.rule import Direction, TurnResult
 
 version = "1.0.0"
 version_str = get_version_str(version)
@@ -26,22 +27,35 @@ version_str = get_version_str(version)
 # ニューラルネットワークの学習用データセット
 class DuelDataset(Dataset):
     def __init__(self, data):
-        self.data = data
+        self.datas = []
+        for d in data:
+            state = d['game_state']
+            turn = {
+                'input': Evaluator.get_input_tensor(state),
+            }
+            action = d['action']
+            target = list(map(
+                lambda x:  -1 if rule.move(state, x)[0]==TurnResult.LOSE else 0,
+                Direction
+            ))
+            if action == Direction.UP:
+                target[0] += 1
+            elif action == Direction.DOWN:
+                target[1] += 1
+            elif action == Direction.LEFT:
+                target[2] += 1
+            elif action == Direction.RIGHT:
+                target[3] += 1
+            turn['target'] = torch.tensor(target, dtype=torch.float32)
+            self.datas.append(turn)
+
 
     def __len__(self):
-        return len(self.data)
+        return len(self.datas)
 
     def __getitem__(self, idx):
-        input_tensor = list(map(lambda x:x,Evaluator.get_input_tensor(self.data[idx]['game_state'])))
-        target = self.data[idx]['action']
-        if target == Direction.UP:
-            target = torch.tensor([1, 0, 0, 0], dtype=torch.float32)
-        elif target == Direction.DOWN:
-            target = torch.tensor([0, 1, 0, 0], dtype=torch.float32)
-        elif target == Direction.LEFT:
-            target = torch.tensor([0, 0, 1, 0], dtype=torch.float32)
-        elif target == Direction.RIGHT:
-            target = torch.tensor([0, 0, 0, 1], dtype=torch.float32)
+        input_tensor = self.datas[idx]['input']
+        target = self.datas[idx]['target']
         return input_tensor, target
 
 class Trainer:
@@ -106,11 +120,11 @@ class Trainer:
                     if isinstance(v, torch.Tensor):
                         state[k] = v.to('cuda')
 
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.MSELoss()
         epoch = int(task['parameters']['epochs'])
 
         #学習ループ
-        early_stopping = EarlyStopping(patience=11, verbose=False)
+        early_stopping = EarlyStopping(patience=7, verbose=False)
         for e in range(epoch):
             if self.cancel:
                 return None
@@ -215,7 +229,7 @@ class Trainer:
 
 def train():
     #APIのURLを設定
-    api_url = 'http://localhost:8080'
+    api_url = 'http://192.168.1.17:8080'
 
     logger = getLogger("Trainer")
     lvl = DEBUG
