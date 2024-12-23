@@ -5,4 +5,9 @@ ktor:
   deployment:
     port: 8080
     debug: true
-    staticRoot: "C:\\Users\\tokuh\\Desktop\\models"
+    staticRoot: "/var/train_data"
+    database:
+      url: "db"
+      port: 5432
+      user: "postgres"
+      password: "postgres"

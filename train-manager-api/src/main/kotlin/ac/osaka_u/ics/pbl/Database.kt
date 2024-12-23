@@ -10,9 +10,11 @@ import org.postgresql.ds.PGSimpleDataSource
 fun Application.configureDatabase(){
     log.info("CONNECTING TO DB")
     Database.connect(PGSimpleDataSource().apply {
-        setURL("jdbc:postgresql://localhost:5432/train_manager")
-        user = "postgres"
-        password = "postgres"
+        val url = environment.config.propertyOrNull("ktor.deployment.database.url")?.getString() ?: "localhost"
+        val port = environment.config.propertyOrNull("ktor.deployment.database.port")?.getString() ?: "5432"
+        user = environment.config.propertyOrNull("ktor.deployment.database.user")?.getString() ?: "postgres"
+        password = environment.config.propertyOrNull("ktor.deployment.database.password")?.getString() ?: "postgres"
+        setURL("jdbc:postgresql://${url}:${port}/train_manager")
     })
     transaction {
         log.info("DB CONNECTION SUCCESSFUL")
