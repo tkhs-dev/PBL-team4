@@ -26,11 +26,11 @@ class Evaluator:
 
     @staticmethod
     def get_input_tensor(game_state : dict) -> (torch.Tensor, torch.Tensor):
-        sneak0_body_board = np.zeros((11,11), dtype=np.integer)
-        sneak0_head_board = np.zeros((11,11), dtype=np.integer)
-        sneak1_body_board = np.zeros((11,11), dtype=np.integer)
-        sneak1_head_board = np.zeros((11,11), dtype=np.integer)
-        food_board = np.zeros((11,11), dtype=np.integer)
+        sneak0_body_board = np.zeros((11,11), dtype=np.int32)
+        sneak0_head_board = np.zeros((11,11), dtype=np.int32)
+        sneak1_body_board = np.zeros((11,11), dtype=np.int32)
+        sneak1_head_board = np.zeros((11,11), dtype=np.int32)
+        food_board = np.zeros((11,11), dtype=np.int32)
         you = game_state["you"]
         for body in you["body"]:
             if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
