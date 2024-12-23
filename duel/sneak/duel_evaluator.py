@@ -38,8 +38,10 @@ class Evaluator:
         if 0 <= you["head"]["x"] < 11 and 0 <= you["head"]["y"] < 11:
             sneak0_head_board[you["head"]["y"]][you["head"]["x"]] = 1
 
+        sneak1_length = 1
         if len(game_state["board"]["snakes"]) == 2:
-            sneak1 = game_state["board"]["snakes"][1]
+            sneak1 = list(filter(lambda x:x['id']==you['id'],game_state["board"]["snakes"]))[0]
+            snaek1_length = len(sneak1["body"])
             for body in sneak1["body"]:
                 if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
                     sneak1_body_board[body["y"]][body["x"]] = 1
@@ -51,7 +53,7 @@ class Evaluator:
             food_board[food["y"]][food["x"]] = 1
         one_hot_encoded = np.stack([sneak0_body_board, sneak0_head_board, sneak1_body_board, sneak1_head_board, food_board], axis=0)
         board_tensor = torch.tensor(one_hot_encoded, dtype=torch.float32)
-        game_tensor = torch.tensor([get_snake_health(game_state)/100,get_snake_length(game_state)/121], dtype=torch.float32)
+        game_tensor = torch.tensor([get_snake_health(game_state)/100,get_snake_length(game_state)/121,sneak1_length-get_snake_length(game_state)], dtype=torch.float32)
         return board_tensor,game_tensor
 
 
@@ -65,7 +67,7 @@ class EvaluatorModel(nn.Module):
             nn.ReLU(),
         )
         self.fc = nn.Sequential(
-            nn.Linear(64 * 11 * 11 + 2, 128),
+            nn.Linear(64 * 11 * 11 + 3, 128),
             nn.ReLU(),
             nn.Linear(128, 4),
         )
