@@ -23,6 +23,10 @@ class ModelRepositoryImpl(private val staticRootPath:String) : ModelRepository {
         if(!dir.exists()) {
             dir.mkdirs()
         }
+        val modelDir = File("$staticRootPath/models")
+        if(!modelDir.exists()) {
+            modelDir.mkdirs()
+        }
     }
     override fun findModelById(id: UUID): Model? {
         return transaction {
