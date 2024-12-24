@@ -9,8 +9,7 @@ pipeline {
 
     stage('build') {
         steps {
-            sh 'cd ./train-manager-api'
-            sh 'docker-compose up -d --build'
+            sh 'cd ./train-manager-api & docker-compose up -d --build'
         }
     }
   }
