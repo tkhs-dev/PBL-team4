@@ -3,12 +3,14 @@ pipeline {
   stages {
     stage('checkout') {
       steps {
-        checkout changelog: false, poll: false, scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'jenkins', url: 'https://github.com/tkhs-dev/PBL-team4']])
+        checkout changelog: false, poll: false, scm: scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'jenkins', url: 'https://github.com/tkhs-dev/PBL-team4']])
       }
     }
 
     stage('build') {
-        sh 'docker-compose up -d --build'
+        steps {
+            sh 'docker-compose up -d --build'
+        }
     }
   }
 }
