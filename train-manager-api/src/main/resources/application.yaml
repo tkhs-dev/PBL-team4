@@ -9,5 +9,5 @@ ktor:
     database:
       url: "db"
       port: 5432
-      user: ${POSTGRES_USER}
-      password: ${POSTGRES_PASSWORD}
+      user: $POSTGRES_USER
+      password: $POSTGRES_PASSWORD
