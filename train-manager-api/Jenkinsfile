@@ -1,0 +1,14 @@
+pipeline {
+  agent any
+  stages {
+    stage('checkout') {
+      steps {
+        checkout changelog: false, poll: false, scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'jenkins', url: 'https://github.com/tkhs-dev/PBL-team4']])
+      }
+    }
+
+    stage('build') {
+        sh 'docker-compose up -d --build'
+    }
+  }
+}
