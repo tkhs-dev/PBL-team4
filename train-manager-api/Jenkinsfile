@@ -9,7 +9,9 @@ pipeline {
 
     stage('build') {
         steps {
-            sh 'cd ./train-manager-api ; docker-compose up -d --build'
+            withCredentials([usernamePassword(credentialsId: 'postgres-credential', passwordVariable: 'POSTGRES_PASSWORD', usernameVariable: 'POSTGRES_USER')]) {
+                sh 'cd ./train-manager-api ; docker-compose up -d --build'
+            }
         }
     }
   }
