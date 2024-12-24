@@ -41,7 +41,7 @@ class Evaluator:
         sneak1_length = 1
         if len(game_state["board"]["snakes"]) == 2:
             sneak1 = list(filter(lambda x:x['id']==you['id'],game_state["board"]["snakes"]))[0]
-            snaek1_length = len(sneak1["body"])
+            sneak1_length = len(sneak1["body"])
             for body in sneak1["body"]:
                 if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
                     sneak1_body_board[body["y"]][body["x"]] = 1
