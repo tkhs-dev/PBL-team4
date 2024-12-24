@@ -42,7 +42,6 @@ class TaskRepositoryImpl : TaskRepository {
         return transaction {
             TaskEntity.find {
                 (Tasks.type eq TaskType.SUPERVISED) and
-                (Tasks.status eq TaskStatus.COMPLETED) and
                 (Tasks.parameters.extract<String>("player_id") eq playerId)
             }.maxByOrNull { it.createdAt }?.toModel()
         }

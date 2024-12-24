@@ -14,41 +14,59 @@ import kotlin.time.Duration.Companion.minutes
 
 class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, private val taskRepos:TaskRepository, private val errorRepos: ErrorRepository, private val queueRepository: QueueRepository, private val taskGeneratorRepository: TaskGeneratorRepository, private val modelRepository: ModelRepository) {
     private fun generateTask(): Task? {
-        val generator = taskGeneratorRepository.findTaskGenerators().getRandomItemByWeight { it.weight.toDouble() } ?: return null
-        when(generator.type){
-            TaskType.SUPERVISED -> {
-                val playerId = generator.parameters["player_id"] as String
-                val newestTask = taskRepos.findNewestSupervisedTaskByPlayerId(playerId)
-                val model = newestTask?.let{
-                    modelRepository.findModelByTaskId(it.id)
+        val generators = taskGeneratorRepository.findTaskGenerators().toMutableList()
+        while (generators.isNotEmpty()) {
+            val generator = generators.getRandomItemByWeight { it.weight.toDouble() } ?: return null
+            when(generator.type){
+                TaskType.SUPERVISED -> {
+                    val playerId = generator.parameters["player_id"] as String
+                    val newestTask = taskRepos.findNewestSupervisedTaskByPlayerId(playerId)
+                    if(newestTask?.status == TaskStatus.PROCESSING){
+                        continue
+                    }
+                    val model = newestTask?.let {
+                        when(it.status){
+                            TaskStatus.WAITING -> return it
+                            TaskStatus.PROCESSING -> {return null}
+                            TaskStatus.ERROR -> {
+                                newestTask.baseModelId?.let {
+                                    modelRepository.findModelById(it)
+                                }
+                            }
+                            TaskStatus.COMPLETED -> {
+                                modelRepository.findModelByTaskId(it.id)
+                            }
+                        }
+                    }
+
+                    val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(generator.parameters["game_count"] as Int).map { it.gameId }
+                    if (games.isEmpty()) {
+                        println("No games found for player $playerId")
+                        return null
+                    }
+                    val epochs = (generator.parameters["epochs"] ?: 200) as Int
+                    val parameter = mapOf(
+                        "player_id" to playerId,
+                        "games" to games,
+                        "epochs" to epochs,
+                    )
+                    val task = Task(
+                        id = UUID.randomUUID(),
+                        status = TaskStatus.WAITING,
+                        errorCount = 0,
+                        baseModelId = model?.id,
+                        type = TaskType.SUPERVISED,
+                        createdAt = Clock.System.now(),
+                        parameter = parameter,
+                    )
+                    return taskRepos.createTask(task)
                 }
-                val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(generator.parameters["game_count"] as Int).map { it.gameId }
-                if (games.isEmpty()) {
-                    println("No games found for player $playerId")
+                TaskType.REINFORCEMENT -> {
                     return null
                 }
-                val epochs = (generator.parameters["epochs"] ?: 200) as Int
-                val parameter = mapOf(
-                    "player_id" to playerId,
-                    "games" to games,
-                    "epochs" to epochs,
-                )
-                val task = Task(
-                    id = UUID.randomUUID(),
-                    status = TaskStatus.WAITING,
-                    errorCount = 0,
-                    baseModelId = model?.id,
-                    type = TaskType.SUPERVISED,
-                    createdAt = Clock.System.now(),
-                    parameter = parameter,
-                )
-                return taskRepos.createTask(task)
-            }
-            TaskType.REINFORCEMENT -> {
-                return null
             }
         }
-
+        return null
     }
 
     fun handleGetNextAssignment(clientId: String): NextResponse? {
@@ -72,6 +90,9 @@ class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, priv
             .forEach {
                 assignmentRepos.updateAssignment(it.id){
                     status = AssignmentStatus.TIMEOUT
+                }
+                taskRepos.updateTask(it.task.id){
+                    status = TaskStatus.WAITING
                 }
                 queueRepository.enqueue(it.task.id)
             }
