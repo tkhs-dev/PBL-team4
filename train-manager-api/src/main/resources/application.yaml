@@ -7,7 +7,7 @@ ktor:
     debug: true
     staticRoot: "/var/train_data"
     database:
-      url: "db"
-      port: 5432
+      url: "$DATABASE_URL:localhost"
+      port: "$DATABASE_PORT:5432"
       user: $POSTGRES_USER
       password: $POSTGRES_PASSWORD
