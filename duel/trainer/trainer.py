@@ -8,7 +8,7 @@ import traceback
 from datetime import datetime
 from time import sleep
 
-from logging import getLogger, DEBUG, StreamHandler, Formatter
+from logging import Logger
 
 import torch
 from early_stopping_pytorch import EarlyStopping
@@ -227,18 +227,7 @@ class Trainer:
                 self.logger.debug("Timer canceled")
                 self.timer.cancel()
 
-def train():
-    #APIのURLを設定
-    api_url = 'http://192.168.1.17:8080'
-
-    logger = getLogger("Trainer")
-    lvl = DEBUG
-    ch = StreamHandler(stream=sys.stdout)
-    ch.setLevel(lvl)
-    ch.setFormatter(Formatter('[%(asctime)s %(levelname)s] %(message)s'))
-    logger.setLevel(lvl)
-    logger.addHandler(ch)
-
+def train(api_url: str, logger:Logger):
     if not file_exists_and_not_empty("client.json"):
         logger.debug("client.json is empty. Register client first.")
         if not file_exists_and_not_empty("user.txt"):
