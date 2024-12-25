@@ -85,7 +85,7 @@ class ApiClientImpl(ApiClient):
         # キャッシュフォルダに保存
         if not os.path.exists("./cache"):
             os.makedirs("./cache")
-        with open(f"./cache/{resp['modelId']}", "wb") as f:
+        with open(f"./cache/{resp['id']}", "wb") as f:
             f.write(model_binary)
         return resp
 
