@@ -42,11 +42,11 @@ class ApiClient(metaclass=abc.ABCMeta):
         pass
 
 class ApiClientImpl(ApiClient):
-    def __init__(self, api_url: str, secret_key: str):
+    def __init__(self, api_url: str, secret_key: str, cache_all: bool = False):
         self.url = api_url
         self.secret_key = secret_key
         self.headers = {'Authorization': f'Bearer {self.secret_key}'}
-        self.counter = 0
+        self.cache_all = cache_all
 
     def register_client(self, name: str) -> Dict | None:
         response = requests.post(f'{self.url}/clients', json={"user":name})
@@ -85,6 +85,10 @@ class ApiClientImpl(ApiClient):
         # キャッシュフォルダに保存
         if not os.path.exists("./cache"):
             os.makedirs("./cache")
+        if not self.cache_all:
+            for file in os.listdir("./cache"):
+                if os.path.isfile(f"./cache/{file}"):
+                    os.remove(f"./cache/{file}")
         with open(f"./cache/{resp['id']}", "wb") as f:
             f.write(model_binary)
         return resp

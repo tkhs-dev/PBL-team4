@@ -219,7 +219,7 @@ class Trainer:
                 self.logger.debug("Timer canceled")
                 self.timer.cancel()
 
-def train(api_url: str, logger:Logger):
+def train(api_url: str, logger:Logger, cache_all:bool):
     if not file_exists_and_not_empty("client.json"):
         logger.debug("client.json is empty. Register client first.")
         if not file_exists_and_not_empty("user.txt"):
@@ -237,6 +237,6 @@ def train(api_url: str, logger:Logger):
     if s:
         client = json.loads(s)
     logger.info(f"Start training as {client["id"]}")
-    api_client = ApiClientImpl(api_url=api_url, secret_key=client["secret"])
+    api_client = ApiClientImpl(api_url=api_url, secret_key=client["secret"], cache_all=cache_all)
     # api_client = TestApiClient()
     Trainer(logger).start(api_client)
