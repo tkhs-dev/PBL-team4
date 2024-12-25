@@ -1,6 +1,7 @@
 import abc
 import io
 import json
+import lzma
 import sys,os
 import zipfile
 from datetime import datetime
@@ -69,11 +70,7 @@ class ApiClientImpl(ApiClient):
 
     def submit_model(self, assignment_id: str, completed_at: int, model_binary) -> Dict | None:
         #モデルを圧縮
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, 'w') as z:
-            z.writestr('checkpoint.pt', model_binary)
-        buffer.seek(0)
-        model_binary = buffer.read()
+        model_binary = lzma.compress(model_binary, preset=9)
 
         data = {
             'completedAt': completed_at
@@ -113,9 +110,7 @@ class ApiClientImpl(ApiClient):
             data.raise_for_status()
             data = data.content
         # zip解凍
-        zip_data = io.BytesIO(data)
-        with zipfile.ZipFile(zip_data) as z:
-            data = z.read(z.namelist()[0])
+        data = lzma.decompress(data)
         return data
 
     def _get(self, endpoint: str) -> Response:
