@@ -2,6 +2,7 @@ import abc
 import io
 import json
 import sys,os
+import zipfile
 from datetime import datetime
 from typing import Dict, Any
 
@@ -67,6 +68,13 @@ class ApiClientImpl(ApiClient):
         return response.json()
 
     def submit_model(self, assignment_id: str, completed_at: int, model_binary) -> Dict | None:
+        #モデルを圧縮
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as z:
+            z.writestr('checkpoint.pt', model_binary)
+        buffer.seek(0)
+        model_binary = buffer.read()
+
         data = {
             'completedAt': completed_at
         }
@@ -76,7 +84,13 @@ class ApiClientImpl(ApiClient):
         }
         response = requests.post(f'{self.url}/assignments/{assignment_id}/register', files=files, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        resp = response.json()
+        # キャッシュフォルダに保存
+        if not os.path.exists("./cache"):
+            os.makedirs("./cache")
+        with open(f"./cache/{resp['modelId']}", "wb") as f:
+            f.write(model_binary)
+        return resp
 
     def post_error(self, assignment_id: str, error: str, client_version: str) -> Dict | None:
         data = {
@@ -88,9 +102,21 @@ class ApiClientImpl(ApiClient):
         return response.json()
 
     def get_model_bytes(self, model_id: str) -> bytes | None:
-        data = requests.get(f'{self.url}/static/models/{model_id}', headers=self.headers)
-        data.raise_for_status()
-        return data.content
+        #キャッシュフォルダを検索
+        if not os.path.exists("./cache"):
+            os.makedirs("./cache")
+        if os.path.exists(f"./cache/{model_id}"):
+            with open(f"./cache/{model_id}", "rb") as f:
+                data = f.read()
+        else:
+            data = requests.get(f'{self.url}/static/models/{model_id}', headers=self.headers)
+            data.raise_for_status()
+            data = data.content
+        # zip解凍
+        zip_data = io.BytesIO(data)
+        with zipfile.ZipFile(zip_data) as z:
+            data = z.read(z.namelist()[0])
+        return data
 
     def _get(self, endpoint: str) -> Response:
         return requests.get(f'{self.url}/{endpoint}', headers=self.headers)

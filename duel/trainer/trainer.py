@@ -16,6 +16,7 @@ from torch.utils.data import Dataset
 
 from api_client import TestApiClient, ApiClientImpl
 from duel.sneak.duel_evaluator import Evaluator, EvaluatorModel
+from duel.trainer.api_client import ApiClient
 from duel.trainer.common import file_exists_and_not_empty, get_version_str
 from game_downloader import GameDownloader
 from shared import rule
@@ -62,7 +63,7 @@ class Trainer:
     def __init__(self, logger=None):
         self.logger = logger
         self.timer = None
-        self.api_client = None
+        self.api_client:ApiClient
         self.cancel = False
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -74,17 +75,8 @@ class Trainer:
 
     #モデルをロードする. キャッシュがあればそれを使う.
     def load_model(self, model_id: str):
-        #キャッシュフォルダを検索
-        if not os.path.exists("./cache"):
-            os.makedirs("./cache")
-        if not os.path.exists(f"./cache/{model_id}"):
-            data = self.api_client.get_model_bytes(model_id)
-            if data is None:
-                self.logger.error(f"Failed to get model({model_id})")
-                return None
-            with open(f"./cache/{model_id}", "wb") as f:
-                f.write(data)
-        data = torch.load(f"./cache/{model_id}", map_location=self.device, weights_only=True)
+        data = self.api_client.get_model_bytes(model_id)
+        data = torch.load(io.BytesIO(data), map_location=self.device, weights_only=True)
         model = EvaluatorModel()
         model.load_state_dict(data['model'])
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
