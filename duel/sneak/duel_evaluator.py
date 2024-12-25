@@ -82,7 +82,11 @@ class EvaluatorModel(nn.Module):
 
     def load(self, path):
         try:
-            self.load_state_dict(torch.load(path, weights_only=True))
+            file = torch.load(path, weights_only=True)
+            if file is dict:
+                self.load_state_dict(file['model'])
+            else:
+                self.load_state_dict(file)
         except:
             self.apply(self._initialize_with_random_weights)
             print("Failed to load model. Randomly initialized")
