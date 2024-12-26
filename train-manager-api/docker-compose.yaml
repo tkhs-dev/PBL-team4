@@ -5,7 +5,9 @@ services:
           context: .
           dockerfile: Dockerfile
         volumes:
-          - modeldir:/var/train_data
+          - type: bind
+            source: /var/train_data
+            target: /var/train_data
         ports:
           - "8080:8080"
         environment:
@@ -35,4 +37,3 @@ networks:
         driver: bridge
 volumes:
     postgres-data:
-    modeldir:
