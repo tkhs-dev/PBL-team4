@@ -1,7 +1,8 @@
 Flask==2.3.2
 requests
-torch==2.5.1+cu124
 deap
 numpy
 websocket-client
 early-stopping-pytorch
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch
