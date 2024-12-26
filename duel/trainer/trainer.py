@@ -116,7 +116,7 @@ class Trainer:
         epoch = int(task['parameters']['epochs'])
 
         #学習ループ
-        early_stopping = EarlyStopping(patience=7, verbose=False)
+        early_stopping = EarlyStopping(patience=7, verbose=False, trace_func=self.logger.debug)
         for e in range(epoch):
             if self.cancel:
                 return None
