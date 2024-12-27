@@ -46,6 +46,7 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
             }
             val epochs = (parameters["epochs"] ?: 200) as Int
             val parameter = mapOf(
+                "player_id" to playerId,
                 "games" to games,
                 "epochs" to epochs,
             )
