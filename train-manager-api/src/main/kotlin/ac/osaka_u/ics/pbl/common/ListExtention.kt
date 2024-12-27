@@ -9,6 +9,7 @@ fun <T> Collection<T>.getRandomItemByWeight(
 
     // 重みの合計を計算
     val totalWeight = sumOf(weightSelector)
+    if (totalWeight == 0.0) return null
 
     // 0からtotalWeightまでのランダムな値を生成
     val randomValue = Random.nextDouble(totalWeight)
