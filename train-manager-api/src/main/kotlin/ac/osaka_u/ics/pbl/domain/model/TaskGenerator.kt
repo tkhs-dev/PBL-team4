@@ -21,18 +21,21 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
     return when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
             val playerId = parameters["player_id"] as String
-            val newestTask = taskRepos.findNewestSupervisedTaskByPlayerId(playerId)
-            val model = newestTask?.let {
-                when(it.status){
-                    TaskStatus.WAITING -> return it
-                    TaskStatus.PROCESSING -> {return@generateTask null}
+            val rootModelId = parameters["root_model_id"] as UUID
+            val newestTask = taskRepos.findNewestSupervisedTaskByRoot(rootModelId.toString())
+            val model = if (newestTask == null){
+                modelRepository.findModelById(rootModelId) ?: return null
+            }else{
+                when(newestTask.status){
+                    TaskStatus.WAITING -> return newestTask
+                    TaskStatus.PROCESSING -> {return null}
                     TaskStatus.ERROR -> {
                         newestTask.baseModelId?.let {
                             modelRepository.findModelById(it)
                         }
                     }
                     TaskStatus.COMPLETED -> {
-                        modelRepository.findModelByTaskId(it.id)
+                        modelRepository.findModelByTaskId(newestTask.id)
                     }
                 }
             }
@@ -43,7 +46,6 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
             }
             val epochs = (parameters["epochs"] ?: 200) as Int
             val parameter = mapOf(
-                "player_id" to playerId,
                 "games" to games,
                 "epochs" to epochs,
             )
@@ -67,6 +69,9 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
 fun TaskGenerator.validateParameters(){
     when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
+            if(parameters["root_model_id"] == null){
+                throw IllegalArgumentException("root_model_id is required for supervised task")
+            }
             if(parameters["player_id"] == null){
                 throw IllegalArgumentException("player_id is required for supervised task")
             }
