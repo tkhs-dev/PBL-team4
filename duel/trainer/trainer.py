@@ -208,7 +208,7 @@ class Trainer:
                 if task['type'] == 'SUPERVISED': #教師あり学習
                     result = self.task_supervised(model, optimizer,task)
                     if not self.cancel:
-                        self.api_client.submit_model(assignment_id, int(datetime.now().timestamp()), result)
+                        self.api_client.submit_model(assignment_id, int(datetime.now().timestamp()*1000), result)
                 else:
                     raise Exception("Unknown task", task)
             except Exception as e:
