@@ -214,7 +214,7 @@ class Trainer:
             except Exception as e:
                 print(traceback.format_exc())
                 self.logger.error(f"Error occurred during training: {e}")
-                self.api_client.post_error(assignment_id, str(e), version_str)
+                self.api_client.post_error(assignment_id, traceback.format_exc(), version_str)
             finally:
                 self.logger.debug("Timer canceled")
                 self.timer.cancel()
