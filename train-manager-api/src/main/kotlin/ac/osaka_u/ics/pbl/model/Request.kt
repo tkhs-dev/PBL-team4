@@ -1,6 +1,7 @@
 package ac.osaka_u.ics.pbl.model
 
 import ac.osaka_u.ics.pbl.common.ParameterMapSerializer
+import ac.osaka_u.ics.pbl.common.TaskGeneratorType
 import ac.osaka_u.ics.pbl.common.TaskType
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
@@ -19,7 +20,7 @@ data class AssignmentErrorRequest(
 @Serializable
 data class PostGeneratorRequest(
     val name: String,
-    val type: TaskType,
+    val type: TaskGeneratorType,
     val weight: Int = 1,
     @Serializable(with = ParameterMapSerializer::class)
     val parameters: Map<String,@Contextual Any>

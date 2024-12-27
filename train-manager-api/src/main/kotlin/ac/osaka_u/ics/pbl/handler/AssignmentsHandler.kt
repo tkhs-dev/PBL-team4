@@ -4,6 +4,7 @@ import ac.osaka_u.ics.pbl.ApiException
 import ac.osaka_u.ics.pbl.common.*
 import ac.osaka_u.ics.pbl.domain.model.Model
 import ac.osaka_u.ics.pbl.domain.model.Task
+import ac.osaka_u.ics.pbl.domain.model.generateTask
 import ac.osaka_u.ics.pbl.domain.repos.*
 import ac.osaka_u.ics.pbl.model.*
 import io.ktor.server.plugins.*
@@ -17,54 +18,11 @@ class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, priv
         val generators = taskGeneratorRepository.findTaskGenerators().toMutableList()
         while (generators.isNotEmpty()) {
             val generator = generators.getRandomItemByWeight { it.weight.toDouble() } ?: return null
-            when(generator.type){
-                TaskType.SUPERVISED -> {
-                    val playerId = generator.parameters["player_id"] as String
-                    val newestTask = taskRepos.findNewestSupervisedTaskByPlayerId(playerId)
-                    if(newestTask?.status == TaskStatus.PROCESSING){
-                        continue
-                    }
-                    val model = newestTask?.let {
-                        when(it.status){
-                            TaskStatus.WAITING -> return it
-                            TaskStatus.PROCESSING -> {return null}
-                            TaskStatus.ERROR -> {
-                                newestTask.baseModelId?.let {
-                                    modelRepository.findModelById(it)
-                                }
-                            }
-                            TaskStatus.COMPLETED -> {
-                                modelRepository.findModelByTaskId(it.id)
-                            }
-                        }
-                    }
-
-                    val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(generator.parameters["game_count"] as Int).map { it.gameId }
-                    if (games.isEmpty()) {
-                        println("No games found for player $playerId")
-                        return null
-                    }
-                    val epochs = (generator.parameters["epochs"] ?: 200) as Int
-                    val parameter = mapOf(
-                        "player_id" to playerId,
-                        "games" to games,
-                        "epochs" to epochs,
-                    )
-                    val task = Task(
-                        id = UUID.randomUUID(),
-                        status = TaskStatus.WAITING,
-                        errorCount = 0,
-                        baseModelId = model?.id,
-                        type = TaskType.SUPERVISED,
-                        createdAt = Clock.System.now(),
-                        parameter = parameter,
-                    )
-                    return taskRepos.createTask(task)
-                }
-                TaskType.REINFORCEMENT -> {
-                    return null
-                }
+            val task = generator.generateTask(taskRepos, modelRepository)
+            if (task != null) {
+                return task
             }
+            generators.remove(generator)
         }
         return null
     }
@@ -192,7 +150,6 @@ class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, priv
 
         assignmentRepos.updateAssignment(assignment.id) {
             status = AssignmentStatus.ERROR
-            statusChangedAt = timestamp
         }
 
         errorRepos.create(

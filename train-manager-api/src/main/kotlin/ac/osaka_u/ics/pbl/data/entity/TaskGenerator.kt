@@ -1,9 +1,7 @@
 package ac.osaka_u.ics.pbl.data.entity
 
-import ac.osaka_u.ics.pbl.common.ParameterMapSerializer
 import ac.osaka_u.ics.pbl.data.dao.TaskGenerators
 import ac.osaka_u.ics.pbl.domain.model.TaskGenerator
-import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.dao.IntEntity
 import org.jetbrains.exposed.dao.IntEntityClass
 import org.jetbrains.exposed.dao.id.EntityID

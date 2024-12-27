@@ -1,6 +1,7 @@
 package ac.osaka_u.ics.pbl.domain.repos
 
-import ac.osaka_u.ics.pbl.common.TaskType
+import ac.osaka_u.ics.pbl.common.TaskGeneratorType
+
 import ac.osaka_u.ics.pbl.data.entity.TaskGeneratorEntity
 import ac.osaka_u.ics.pbl.data.entity.toEntity
 import ac.osaka_u.ics.pbl.data.entity.toModel
@@ -9,7 +10,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 class TaskGeneratorUpdateBuilder{
     var name: String? = null
-    var type: TaskType? = null
+    var type: TaskGeneratorType? = null
     var weight: Int? = null
     var parameters: Map<String, Any>? = null
 }

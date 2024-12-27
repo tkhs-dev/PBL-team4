@@ -4,6 +4,7 @@ import ac.osaka_u.ics.pbl.ApiException
 import ac.osaka_u.ics.pbl.common.LeaderboardApi
 import ac.osaka_u.ics.pbl.common.TaskType
 import ac.osaka_u.ics.pbl.domain.model.TaskGenerator
+import ac.osaka_u.ics.pbl.domain.model.validateParameters
 import ac.osaka_u.ics.pbl.domain.repos.TaskGeneratorRepository
 import ac.osaka_u.ics.pbl.domain.repos.TaskRepository
 import ac.osaka_u.ics.pbl.model.PostGeneratorRequest
@@ -36,26 +37,6 @@ class TasksHandler(private val taskRepo: TaskRepository, private val generatorRe
     }
 
     fun handlePostGenerator(request: PostGeneratorRequest): TaskGeneratorResponse {
-        when(request.type){
-            TaskType.SUPERVISED -> {
-                if(request.parameters["player_id"] == null){
-                    throw ApiException.BadRequestException("player_id is required for supervised task")
-                }
-                if(!LeaderboardApi.playerExists(request.parameters["player_id"] as String)){
-                    throw ApiException.BadRequestException("specified player does not exist on the leaderboard")
-                }
-                if(request.parameters["game_count"]?.let { it is Int } == false){
-                    throw ApiException.BadRequestException("game_count is required for supervised task")
-                }
-            }
-            TaskType.REINFORCEMENT -> {
-                // do nothing
-            }
-            else -> {
-                throw ApiException.BadRequestException("Invalid task type")
-            }
-        }
-
         val generator = TaskGenerator(
             id = 0,
             name = request.name,
@@ -63,6 +44,11 @@ class TasksHandler(private val taskRepo: TaskRepository, private val generatorRe
             weight = request.weight,
             parameters = request.parameters
         )
+        try {
+            generator.validateParameters()
+        } catch (e: IllegalArgumentException) {
+            throw ApiException.BadRequestException(e.message ?: "Invalid parameters")
+        }
         return generatorRepo.create(generator).toResponse()
     }
 

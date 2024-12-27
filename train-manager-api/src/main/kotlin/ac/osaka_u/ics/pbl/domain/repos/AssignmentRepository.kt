@@ -103,6 +103,7 @@ class AssignmentRepositoryImpl : AssignmentRepository {
                 builder.deadline?.let { deadline -> it[Assignments.deadline] = deadline }
                 builder.status?.let { status -> it[Assignments.status] = status }
                 builder.statusChangedAt?.let { statusChangedAt -> it[Assignments.statusChangedAt] = statusChangedAt }
+                    ?: builder.status ?.let { _ -> it[Assignments.statusChangedAt] = Clock.System.now()}
                 builder.taskId?.let { taskId -> it[Assignments.task] = EntityID(taskId, Tasks) }
             }
         }
