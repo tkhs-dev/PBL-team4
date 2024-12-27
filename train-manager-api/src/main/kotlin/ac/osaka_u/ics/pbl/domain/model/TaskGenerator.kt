@@ -27,7 +27,7 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
                 modelRepository.findModelById(rootModelId) ?: return null
             }else{
                 when(newestTask.status){
-                    TaskStatus.WAITING -> return newestTask
+                    TaskStatus.WAITING -> return null
                     TaskStatus.PROCESSING -> {return null}
                     TaskStatus.ERROR -> {
                         newestTask.baseModelId?.let {
