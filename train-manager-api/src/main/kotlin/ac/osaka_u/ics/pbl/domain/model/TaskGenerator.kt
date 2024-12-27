@@ -21,7 +21,7 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
     return when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
             val playerId = parameters["player_id"] as String
-            val rootModelId = parameters["root_model_id"] as UUID
+            val rootModelId = UUID.fromString(parameters["root_model_id"] as String)
             val newestTask = taskRepos.findNewestSupervisedTaskByRoot(rootModelId.toString())
             val model = if (newestTask == null){
                 modelRepository.findModelById(rootModelId) ?: return null
