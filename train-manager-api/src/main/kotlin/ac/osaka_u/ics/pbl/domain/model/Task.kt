@@ -12,5 +12,6 @@ data class Task(
     val baseModelId: UUID?,
     val type: TaskType,
     val createdAt: Instant,
+    val generatorId: Int,
     val parameter: Map<String, Any>
 )

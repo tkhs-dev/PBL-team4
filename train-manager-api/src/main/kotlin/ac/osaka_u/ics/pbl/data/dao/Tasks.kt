@@ -17,5 +17,6 @@ object Tasks : UUIDTable("tasks") {
     val baseModelId = reference("base_model_id", Models.id).nullable()
     val type = enumeration("type", TaskType::class)
     val createdAt = timestamp("created_at")
+    val generatorId = integer("generator_id").references(TaskGenerators.id)
     val parameters = jsonb<Map<String,Any>>("parameters", format, ParameterMapSerializer)
 }

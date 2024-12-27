@@ -18,6 +18,7 @@ class TaskEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     var baseModelId by Tasks.baseModelId
     var type by Tasks.type
     var createdAt by Tasks.createdAt
+    var generatorId by Tasks.generatorId
     var parameters by Tasks.parameters
 }
 
@@ -28,6 +29,7 @@ fun TaskEntity.toModel() = Task(
     baseModelId = baseModelId?.value,
     type = type,
     createdAt = createdAt,
+    generatorId = generatorId,
     parameter = parameters
 )
 
@@ -37,5 +39,6 @@ fun Task.toEntity() = TaskEntity.new(id) {
     baseModelId = this@toEntity.baseModelId?.let { EntityID(it, Models) }
     type = this@toEntity.type
     createdAt = this@toEntity.createdAt
+    generatorId = this@toEntity.generatorId
     parameters = this@toEntity.parameter
 }

@@ -36,6 +36,7 @@ class QueueHandler(private val queueRepository: QueueRepository, private val tas
                 baseModelId = baseUid,
                 type = request.type,
                 createdAt = Clock.System.now(),
+                generatorId = request.generatorReference,
                 parameter = request.parameters
             )
         )

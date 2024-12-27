@@ -24,7 +24,7 @@ class TaskUpdateBuilder(val task: Task) {
 
 interface TaskRepository {
     fun findTaskById(id: UUID): Task?
-    fun findNewestSupervisedTaskByRoot(rootModelId: String): Task?
+    fun findNewestByGeneratorId(generatorId:Int,taskType: TaskType): Task?
     fun findTasks(limit: Int = 10, completed: Boolean = false): List<Task>
     fun createTask(task: Task): Task
     fun updateTask(id: UUID, update: TaskUpdateBuilder.() -> Unit): Task?
@@ -38,11 +38,11 @@ class TaskRepositoryImpl : TaskRepository {
         }
     }
 
-    override fun findNewestSupervisedTaskByRoot(rootModelId: String): Task? {
+    override fun findNewestByGeneratorId(generatorId: Int, taskType: TaskType): Task? {
         return transaction {
             TaskEntity.find {
-                (Tasks.type eq TaskType.SUPERVISED) and
-                (Tasks.parameters.extract<String>("root_model_id") eq rootModelId)
+                (Tasks.type eq taskType) and
+                        (Tasks.generatorId eq generatorId)
             }.maxByOrNull { it.createdAt }?.toModel()
         }
     }

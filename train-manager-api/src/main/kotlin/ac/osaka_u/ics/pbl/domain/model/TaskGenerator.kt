@@ -21,21 +21,18 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
     return when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
             val playerId = parameters["player_id"] as String
-            val rootModelId = UUID.fromString(parameters["root_model_id"] as String)
-            val newestTask = taskRepos.findNewestSupervisedTaskByRoot(rootModelId.toString())
-            val model = if (newestTask == null){
-                modelRepository.findModelById(rootModelId) ?: return null
-            }else{
-                when(newestTask.status){
+            val newestTask = taskRepos.findNewestByGeneratorId(id, TaskType.SUPERVISED)
+            val model = newestTask?.let{
+                when(it.status){
                     TaskStatus.WAITING -> return null
-                    TaskStatus.PROCESSING -> {return null}
+                    TaskStatus.PROCESSING -> return null
                     TaskStatus.ERROR -> {
-                        newestTask.baseModelId?.let {
-                            modelRepository.findModelById(it)
+                        it.baseModelId?.let { baseModelId ->
+                            modelRepository.findModelById(baseModelId)
                         }
                     }
                     TaskStatus.COMPLETED -> {
-                        modelRepository.findModelByTaskId(newestTask.id)
+                        modelRepository.findModelByTaskId(it.id)
                     }
                 }
             }
@@ -57,6 +54,7 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
                 baseModelId = model?.id,
                 type = TaskType.SUPERVISED,
                 createdAt = Clock.System.now(),
+                generatorId = id,
                 parameter = parameter,
             )
             return taskRepos.createTask(task)
@@ -70,9 +68,6 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
 fun TaskGenerator.validateParameters(){
     when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
-            if(parameters["root_model_id"] == null){
-                throw IllegalArgumentException("root_model_id is required for supervised task")
-            }
             if(parameters["player_id"] == null){
                 throw IllegalArgumentException("player_id is required for supervised task")
             }

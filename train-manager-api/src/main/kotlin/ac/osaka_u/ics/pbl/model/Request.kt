@@ -30,6 +30,7 @@ data class PostGeneratorRequest(
 data class TaskRequest(
     val baseModelId: String?,
     val type: TaskType,
+    val generatorReference: Int = 0,
     @Serializable(with = ParameterMapSerializer::class)
     val parameters: Map<String,@Contextual Any>
 )
