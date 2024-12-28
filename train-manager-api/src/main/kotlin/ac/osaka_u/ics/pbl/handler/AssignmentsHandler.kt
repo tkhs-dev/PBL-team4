@@ -39,6 +39,10 @@ class AssignmentsHandler(private val assignmentRepos: AssignmentRepository, priv
                     assignmentRepos.updateAssignment(it.id){
                         status = AssignmentStatus.TIMEOUT
                     }
+                    taskRepos.updateTask(it.task.id){
+                        status = TaskStatus.WAITING
+                    }
+                    queueRepository.enqueue(it.task.id)
                 }else{
                     return it.toNextResponse()
                 }
