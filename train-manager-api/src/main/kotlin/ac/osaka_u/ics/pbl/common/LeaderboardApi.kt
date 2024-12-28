@@ -6,12 +6,13 @@ import org.jsoup.Jsoup
 class LeaderboardApi {
     companion object {
         const val BASE_URL = "https://play.battlesnake.com/leaderboard/standard-duels"
-        fun getLeaderboard(limit: Int = 100): List<String> {
+        fun getLeaderboard(limit: Int = 100): List<Pair<String,String>> {
             return runBlocking {
                 val doc = Jsoup.connect(BASE_URL).get()
                 val table = doc.selectXpath("""/html/body/div[1]/div/main/div[2]/div[2]/table/tbody/tr""")
                 table.drop(1).take(limit).map {
-                    it.select("td")[2].select("a").attr("href").split("/")[3]
+                    val td = it.select("td")[2]
+                    td.text() to td.select("a").attr("href").split("/")[3]
                 }
             }
         }
