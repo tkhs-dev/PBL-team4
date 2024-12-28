@@ -93,7 +93,8 @@ class Trainer:
                 with open(f"./cache/games/{game}.json", "r") as f:
                     data= json.load(f)
             else:
-                data = downloader.download_data(game,task['parameters']['player_id'])
+                player_id,game_id = game.split("_")
+                data = downloader.download_data(game_id, player_id)
                 with open(f"./cache/games/{game}.json", "w") as f:
                     f.write(json.dumps(data))
             #すべてのゲームについてデータをダウンロードし, 最後のターン以外をdatasに追加

@@ -18,65 +18,73 @@ data class TaskGenerator(
 )
 
 fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: ModelRepository): Task? {
-    return when(type){
-        TaskGeneratorType.SPECIFIC_PLAYER -> {
-            val playerId = parameters["player_id"] as String
-            val newestTask = taskRepos.findNewestByGeneratorId(id, TaskType.SUPERVISED)
-            val model = newestTask?.let{
-                when(it.status){
-                    TaskStatus.WAITING -> return null
-                    TaskStatus.PROCESSING -> return null
-                    TaskStatus.ERROR -> {
-                        it.baseModelId?.let { baseModelId ->
-                            modelRepository.findModelById(baseModelId)
-                        }
-                    }
-                    TaskStatus.COMPLETED -> {
-                        modelRepository.findModelByTaskId(it.id)
-                    }
+    val taskType = when(type){
+        TaskGeneratorType.SPECIFIC_PLAYER -> TaskType.SUPERVISED
+        TaskGeneratorType.RANDOM_MATCH -> TaskType.SUPERVISED
+    }
+    val newestTask = taskRepos.findNewestByGeneratorId(id, taskType)
+    val baseModel = newestTask?.let{
+        when(it.status){
+            TaskStatus.WAITING -> return null
+            TaskStatus.PROCESSING -> return null
+            TaskStatus.ERROR -> {
+                it.baseModelId?.let { baseModelId ->
+                    modelRepository.findModelById(baseModelId)
                 }
             }
-
-            val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(parameters["game_count"] as Int).map { it.gameId }
-            if (games.isEmpty()) {
-                return null
+            TaskStatus.COMPLETED -> {
+                modelRepository.findModelByTaskId(it.id)
             }
-            val epochs = (parameters["epochs"] ?: 200) as Int
-            val parameter = mapOf(
-                "player_id" to playerId,
-                "games" to games,
-                "epochs" to epochs,
-            )
-            val task = Task(
-                id = UUID.randomUUID(),
-                status = TaskStatus.WAITING,
-                errorCount = 0,
-                baseModelId = model?.id,
-                type = TaskType.SUPERVISED,
-                createdAt = Clock.System.now(),
-                generatorId = id,
-                parameter = parameter,
-            )
-            return taskRepos.createTask(task)
-        }
-        TaskGeneratorType.RANDOM_MATCH -> {
-            null
         }
     }
+    val parameter = when(type){
+        TaskGeneratorType.SPECIFIC_PLAYER -> {
+            val playerId = parameters["player_id"] as String
+            val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(parameters["game_count"] as Int).map { it.gameId }
+            if (games.isEmpty()) return null
+            mapOf(
+                "games" to games.map { "${playerId}_${it}"},
+                "epochs" to (parameters["epochs"] ?: 200) as Int,
+            )
+        }
+        TaskGeneratorType.RANDOM_MATCH -> {
+            val games = LeaderboardApi.getLeaderboard(limit = 10)
+                .map { it to LeaderboardApi.getPlayerGames(it).filter { it.turns >= 50 } }
+                .flatMap { (player, games) -> games.map { "${player}_${it.gameId}" } }
+            mapOf(
+                "games" to games.shuffled().take(parameters["game_count"] as Int),
+                "epochs" to (parameters["epochs"] ?: 200) as Int,
+            )
+        }
+    }
+    return taskRepos.createTask(
+        Task(
+            id = UUID.randomUUID(),
+            status = TaskStatus.WAITING,
+            errorCount = 0,
+            baseModelId = baseModel?.id,
+            type = taskType,
+            createdAt = Clock.System.now(),
+            generatorId = id,
+            parameter = parameter,
+        )
+    )
 }
 
 fun TaskGenerator.validateParameters(){
     when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
-            if(parameters["player_id"] == null){
-                throw IllegalArgumentException("player_id is required for supervised task")
+            if(parameters["player_id"]?.let { LeaderboardApi.playerExists(it as String) } == false){
+                throw IllegalArgumentException("valid player_id is required for supervised task")
             }
             if(parameters["game_count"]?.let { it is Int } == false){
                 throw IllegalArgumentException("game_count is required for supervised task")
             }
         }
         TaskGeneratorType.RANDOM_MATCH -> {
-            // do nothing
+            if(parameters["game_count"]?.let { it is Int } == false){
+                throw IllegalArgumentException("game_count is required for supervised task")
+            }
         }
     }
 }
