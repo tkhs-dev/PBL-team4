@@ -40,10 +40,10 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
     val parameter = when(type){
         TaskGeneratorType.SPECIFIC_PLAYER -> {
             val playerId = parameters["player_id"] as String
-            val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(parameters["game_count"] as Int).map { it.gameId }
+            val games = LeaderboardApi.getPlayerGames(playerId).shuffled().take(parameters["game_count"] as Int).map { it.playerName to it.gameId }
             if (games.isEmpty()) return null
             mapOf(
-                "games" to games.map { "${playerId}_${it}"},
+                "games" to games.map { "${it.first}_${it.second}"},
                 "epochs" to (parameters["epochs"] ?: 200) as Int,
             )
         }

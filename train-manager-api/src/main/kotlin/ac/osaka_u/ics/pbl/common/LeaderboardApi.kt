@@ -36,6 +36,7 @@ class LeaderboardApi {
                     return@runBlocking emptyList<PlayerGame>()
                 }
                 val table = doc.selectXpath("""/html/body/div[1]/div/main/div[2]/table/tbody/tr""")
+                val playerName = doc.selectXpath("""/html/body/div[1]/div/main/div[1]/p[2]/a""").text()
                 table.drop(0).map {
                     val tds = it.select("td")
                     val resultTxt = tds[0].text()
@@ -46,7 +47,7 @@ class LeaderboardApi {
                     }
                     val turns = tds[2].text().toInt()
                     val gameId = tds[3].select("a").attr("href").drop(6)
-                    PlayerGame(gameId, result, turns)
+                    PlayerGame(playerName, gameId, result, turns)
                 }.filter { it.result in resultQuery }
                     .take(limit)
             }
@@ -57,5 +58,5 @@ class LeaderboardApi {
         WIN, LOSS, DRAW
     }
 
-    data class PlayerGame(val gameId: String, val result: GameResult, val turns: Int)
+    data class PlayerGame(val playerName:String, val gameId: String, val result: GameResult, val turns: Int)
 }
