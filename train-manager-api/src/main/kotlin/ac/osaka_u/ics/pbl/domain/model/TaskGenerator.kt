@@ -50,9 +50,9 @@ fun TaskGenerator.generateTask(taskRepos: TaskRepository, modelRepository: Model
         TaskGeneratorType.RANDOM_MATCH -> {
             val games = LeaderboardApi.getLeaderboard(limit = 10)
                 .map { it.first to LeaderboardApi.getPlayerGames(it.second).filter { it.turns >= 50 } }
+                .flatMap { (player, games) -> games.map { "${player}_${it.gameId}" } }
                 .shuffled()
                 .take(parameters["game_count"] as Int)
-                .flatMap { (player, games) -> games.map { "${player}_${it.gameId}" } }
             mapOf(
                 "games" to games,
                 "epochs" to (parameters["epochs"] ?: 200) as Int,
