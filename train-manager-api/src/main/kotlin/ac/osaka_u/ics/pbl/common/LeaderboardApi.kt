@@ -11,7 +11,7 @@ class LeaderboardApi {
                 val doc = Jsoup.connect(BASE_URL).get()
                 val table = doc.selectXpath("""/html/body/div[1]/div/main/div[2]/div[2]/table/tbody/tr""")
                 table.drop(1).take(limit).map {
-                    it.select("td")[2].text()
+                    it.select("td")[2].select("a").attr("href").split("/")[3]
                 }
             }
         }
