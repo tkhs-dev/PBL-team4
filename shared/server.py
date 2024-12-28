@@ -12,6 +12,8 @@ def run_server(handlers: typing.Dict):
 
     @app.get("/")
     def on_info():
+        if "info" in handlers:
+            return handlers["info"]()
         return {
             "apiversion": "1",
             "author": "",  # TODO: Your Battlesnake Username
