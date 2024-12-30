@@ -57,6 +57,6 @@ if __name__ == "__main__":
         with lzma.open(args.input, "rb") as f:
             evaluator.model.load_state_dict(torch.load(f, weights_only=True)["model"])
     else:
-        evaluator.load(args.input)
+        evaluator.model.load_state_dict(torch.load(args.input, weights_only=True))
     player = AIPlayer(evaluator)
     run_server({"info":lambda :info(args), "start": player.on_start, "move": lambda game_state: {"move":player.on_move(game_state).value}, "end": player.on_end})
