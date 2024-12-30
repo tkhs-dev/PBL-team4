@@ -190,7 +190,16 @@ func startGame(clients []*Client, setting *GameSetting) (*GameResult, error) {
 		result = "lose"
 	}
 	if len(gameState.snakeStates) > 1 {
-		result = "draw"
+		var isDraw = true
+		for _, snake := range boardState.Snakes {
+			if snake.EliminatedCause != rules.NotEliminated {
+				isDraw = false
+				break
+			}
+		}
+		if isDraw {
+			result = "draw"
+		}
 	}
 
 	return &GameResult{
