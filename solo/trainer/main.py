@@ -13,7 +13,7 @@ from deap import tools
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from solo.sneak.evaluator import EvaluatorModel, Evaluator
 from solo.sneak.player import AIPlayer
-from solo.trainer.rules import start_solo_game, Client, GameSettings
+from shared.embedded_rules import start_solo_game, Client, GameSettings
 from shared import rule
 from shared.rule import Direction
 

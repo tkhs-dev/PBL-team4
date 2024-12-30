@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 
 lib = ctypes.CDLL("../../embedded-rules/build/rules.dll")
 lib.StartSoloGame.restype = ctypes.POINTER(ctypes.c_char)
+lib.StartDuelGame.restype = ctypes.POINTER(ctypes.c_char)
 CALLBACKFUNC = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_char))
 
 class ClientCStruct(ctypes.Structure):
@@ -35,8 +36,6 @@ class Client:
             return 2
         elif direction == Direction.RIGHT:
             return 3
-        elif direction == Direction.SURRENDER:
-            return 4
         else :
             return 0
 
@@ -85,6 +84,13 @@ class GameSettings:
 
 def start_solo_game(callback_funcs : Client, settings : GameSettings) -> dict:
     result_text = lib.StartSoloGame(callback_funcs.to_c_struct(), settings.to_c_struct())
+    result = json.loads(ctypes.string_at(result_text))
+    ctypes.cdll.msvcrt.free(result_text)
+    return result
+
+def start_duel_game(callback_funcs1 : Client, callback_funcs2 : Client, settings : GameSettings) -> dict:
+    result_text = lib.StartDuelGame(callback_funcs1.to_c_struct(), callback_funcs2.to_c_struct(), settings.to_c_struct())
+    print(result_text)
     result = json.loads(ctypes.string_at(result_text))
     ctypes.cdll.msvcrt.free(result_text)
     return result
