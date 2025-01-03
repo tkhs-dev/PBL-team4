@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--input', type=str, default='./evaluator.pth')
     parser.add_argument('--zipped', action='store_true')
     parser.add_argument('-m', '--model', type=str)
+    parser.add_argument('--safe', action='store_true')
     args = parser.parse_args()
     from shared.server import run_server
     evaluator = Evaluator()
@@ -58,5 +59,5 @@ if __name__ == "__main__":
             evaluator.model.load_state_dict(torch.load(f, weights_only=True)["model"])
     else:
         evaluator.model.load_state_dict(torch.load(args.input, weights_only=True))
-    player = AIPlayer(evaluator)
+    player = AIPlayer(evaluator, safe=args.safe)
     run_server({"info":lambda :info(args), "start": player.on_start, "move": lambda game_state: {"move":player.on_move(game_state).value}, "end": player.on_end})
