@@ -70,11 +70,12 @@ type GameState struct {
 }
 
 type GameResult struct {
-	Result string         `json:"result"`
-	Cause  string         `json:"cause"`
-	Turn   int            `json:"turn"`
-	You    client.Snake   `json:"you"`
-	Snakes []client.Snake `json:"snakes"`
+	Result     string         `json:"result"`
+	KillCause  string         `json:"kill"`
+	DeathCause string         `json:"cause"`
+	Turn       int            `json:"turn"`
+	You        client.Snake   `json:"you"`
+	Snakes     []client.Snake `json:"snakes"`
 }
 
 func (c *Client) callOnStart() {
@@ -177,10 +178,12 @@ func startGame(clients []*Client, setting *GameSetting) (*GameResult, error) {
 	}
 
 	var youSnake *rules.Snake
+	var opponentSnake *rules.Snake
 	for _, snk := range boardState.Snakes {
 		if "snake-0" == snk.ID {
 			youSnake = &snk
-			break
+		} else if "snake-1" == snk.ID {
+			opponentSnake = &snk
 		}
 	}
 
@@ -204,11 +207,12 @@ func startGame(clients []*Client, setting *GameSetting) (*GameResult, error) {
 	}
 
 	return &GameResult{
-		Result: result,
-		Cause:  youSnake.EliminatedCause,
-		Turn:   boardState.Turn,
-		You:    convertRulesSnake(*youSnake, gameState.snakeStates[youSnake.ID]),
-		Snakes: convertRulesSnakes(boardState.Snakes, gameState.snakeStates, true),
+		Result:     result,
+		KillCause:  opponentSnake.EliminatedCause,
+		DeathCause: youSnake.EliminatedCause,
+		Turn:       boardState.Turn,
+		You:        convertRulesSnake(*youSnake, gameState.snakeStates[youSnake.ID]),
+		Snakes:     convertRulesSnakes(boardState.Snakes, gameState.snakeStates, true),
 	}, nil
 
 }
