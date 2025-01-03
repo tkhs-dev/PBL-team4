@@ -71,6 +71,7 @@ type GameState struct {
 
 type GameResult struct {
 	Result string         `json:"result"`
+	Cause  string         `json:"cause"`
 	Turn   int            `json:"turn"`
 	You    client.Snake   `json:"you"`
 	Snakes []client.Snake `json:"snakes"`
@@ -204,6 +205,7 @@ func startGame(clients []*Client, setting *GameSetting) (*GameResult, error) {
 
 	return &GameResult{
 		Result: result,
+		Cause:  youSnake.EliminatedCause,
 		Turn:   boardState.Turn,
 		You:    convertRulesSnake(*youSnake, gameState.snakeStates[youSnake.ID]),
 		Snakes: convertRulesSnakes(boardState.Snakes, gameState.snakeStates, true),

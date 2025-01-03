@@ -24,6 +24,17 @@ class Direction(str,Enum):
         elif self == Direction.RIGHT:
             return 1,0
 
+    @staticmethod
+    def index(index):
+        if index == 1:
+            return Direction.DOWN
+        elif index == 2:
+            return Direction.LEFT
+        elif index == 3:
+            return  Direction.RIGHT
+        else:
+            return Direction.UP
+
 def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     #------ IMPORTANT ------
     #pythonのdictは参照渡しであるため、game_stateを変更すると元のgame_stateも変更される

@@ -5,25 +5,43 @@ import threading
 import os
 import io
 import traceback
+import random
+from collections import deque
 from datetime import datetime
 from time import sleep
 
 from logging import Logger
 
+import numpy as np
 import torch
 from early_stopping_pytorch import EarlyStopping
+from torch import optim, nn
 from torch.utils.data import Dataset
 
 from api_client import TestApiClient, ApiClientImpl
 from duel.sneak.duel_evaluator import Evaluator, EvaluatorModel
+from duel.sneak.duel_player import AIPlayer
 from duel.trainer.api_client import ApiClient
 from duel.trainer.common import file_exists_and_not_empty, get_version_str
 from game_downloader import GameDownloader
 from shared import rule
-from shared.rule import Direction, TurnResult
+from shared.embedded_rules import GameSettings, Client, start_duel_game
+from shared.rule import Direction, TurnResult, move
 
 version = "1.0.0"
 version_str = get_version_str(version)
+
+class CancelToken:
+    def __init__(self):
+        self._cancel_requested = False
+
+    def request_cancel(self):
+        """キャンセルをリクエストする"""
+        self._cancel_requested = True
+
+    def is_cancellation_requested(self):
+        """キャンセルがリクエストされたか確認する"""
+        return self._cancel_requested
 
 # ニューラルネットワークの学習用データセット
 class DuelDataset(Dataset):
@@ -59,29 +77,40 @@ class DuelDataset(Dataset):
         target = self.datas[idx]['target']
         return input_tensor, target
 
-class Trainer:
-    def __init__(self, logger=None):
-        self.logger = logger
-        self.timer = None
-        self.api_client:ApiClient
-        self.cancel = False
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+class ReplayMemory:
+    def __init__(self, capacity):
+        self.memory = deque(maxlen=capacity)
+        self.weights = deque(maxlen=capacity)
 
-    #シグナルハンドラ
-    def sig_handler(self,signum, frame) -> None:
-        self.logger.info("Received signal")
-        self.logger.info("Canceling training...")
-        sys.exit(1)
+    def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done, weight=1):
+        self.memory.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
+        self.weights.append(weight)
+
+
+    def sample(self, batch_size):
+        return random.choices(self.memory, k=batch_size, weights=self.weights)
+
+    def __len__(self):
+        return len(self.memory)
+
+class Trainer:
+    def __init__(self, logger, api_client:ApiClient, device, cancel_token:CancelToken):
+        self.logger = logger
+        self.api_client = api_client
+        self.device = device
+        self.cancel_token = cancel_token
 
     #モデルをロードする. キャッシュがあればそれを使う.
     def load_model(self, model_id: str):
         data = self.api_client.get_model_bytes(model_id)
-        data = torch.load(io.BytesIO(data), map_location=self.device, weights_only=True)
-        model = EvaluatorModel()
-        model.load_state_dict(data['model'])
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        optimizer.load_state_dict(data['optimizer'])
-        return model,optimizer
+        return torch.load(io.BytesIO(data), map_location=self.device, weights_only=True)
+
+    def start(self, task):
+        pass
+
+class SupervisedTrainer(Trainer):
+    def __init__(self, logger, api_client:ApiClient, device, cancel_token:CancelToken):
+        super().__init__(logger, api_client, device, cancel_token)
 
     def task_supervised(self, base_model:EvaluatorModel, optimizer:torch.optim.Adam, task, batch_size = 64) -> bytes | None:
         print("Supervised training started")
@@ -119,7 +148,7 @@ class Trainer:
         #学習ループ
         early_stopping = EarlyStopping(patience=7, verbose=False, trace_func=self.logger.debug)
         for e in range(epoch):
-            if self.cancel:
+            if self.cancel_token.is_cancellation_requested():
                 return None
             model.train()
             total_loss = 0
@@ -145,80 +174,237 @@ class Trainer:
         }, buffer)
         return buffer.getvalue()
 
-    #期限が近いた時に呼ばれるコールバック
-    def timeout_callback(self, assignment_id) -> None:
-        resp = self.api_client.refresh_assignment(assignment_id) #タスクの期限を更新
-        #期限が更新できなかった場合, タスクをキャンセル
-        if resp is None:
-            self.cancel = True
-            self.logger.debug(f"Failed to refresh assignment({assignment_id}). Task is canceled.")
-            return
-        deadline = datetime.fromtimestamp(resp['deadline']/1000)
+    def load_model(self, model_id: str):
+        data = super().load_model(model_id)
+        model = EvaluatorModel()
+        model.load_state_dict(data['model'])
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        optimizer.load_state_dict(data['optimizer'])
+        return model,optimizer
 
-        #タイマーを再設定
-        self.timer.cancel()
-        time_out = (deadline - datetime.now()).total_seconds() - 10
-        self.timer = threading.Timer(time_out, self.timeout_callback, args=[assignment_id])
-        self.timer.start()
-        self.logger.debug(f"Assignment({assignment_id}) is refreshed. New deadline is {deadline}")
-
-    def start(self, api_client):
-        self.api_client = api_client
-        signal.signal(signal.SIGINT, self.sig_handler) #シグナルハンドラを設定
-
+    def start(self, task):
         if not os.path.exists("./cache/games"):
             os.makedirs("./cache/games")
 
-        self.logger.debug(f"Start training on device {self.device}")
+        #ベースモデルが指定されている場合はロード, 指定されていない新規作成
+        if task['baseModelId'] is None:
+            model = EvaluatorModel()
+            optimizer = None
+        else:
+            model,optimizer = self.load_model(task['baseModelId'])
+            if model is None:
+                raise Exception(f"Failed to load model({task['baseModelId']})")
 
-        while True:
-            print("--------------------------------------------")
-            self.logger.info("Get next assignment...")
-            assignment = self.api_client.get_assignment()
+        return self.task_supervised(model, optimizer, task)
 
-            #タスクがない場合, 2分待って再度取得
-            if assignment is None:
-                self.logger.info("No task is assigned. Wait for 2 minutes and try again.")
-                sleep(120)
-                continue
+# ハイパーパラメータ
+GAMMA = 0.99  # 割引率
+LR = 0.0005   # 学習率
+BATCH_SIZE = 64
+EPSILON_START = 1.0
+EPSILON_END = 0.05
+EPSILON_DECAY = 20000
+MEMORY_CAPACITY = 10000
+TARGET_UPDATE = 200
 
-            assignment_id = assignment['id']
-            task = assignment['task']
-            deadline = datetime.fromtimestamp(assignment['deadline']/1000)
+class ReinforcementTrainer(Trainer):
 
-            self.logger.info(f"Received assignment({assignment_id}) [deadline:{deadline}]",)
-            self.logger.info(f"Start training for {task}")
+    def __init__(self, logger, api_client:ApiClient, device, cancel_token:CancelToken):
+        super().__init__(logger, api_client, device, cancel_token)
+        self.device = device
+        self.policy_net = EvaluatorModel().to(device)
+        self.target_net = EvaluatorModel().to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.target_net.eval()
+        self.optimizer = None
+        self.memory = ReplayMemory(MEMORY_CAPACITY)
+        self.total_reward = 0
+        self.steps_done = 0
 
-            #タイマーを設定
-            timeout = (deadline - datetime.now()).total_seconds() - 10
-            self.timer = threading.Timer(timeout, self.timeout_callback, args=[assignment_id])
+        self.last_action = None
+        self.last_state_tensor = None
+        self.next_state_tensor = None
 
-            try:
-                self.cancel = False
-                self.timer.start()
+    # ε-greedyポリシー
+    def select_action(self, game_state, state, n_actions, force_safe_action=False):
+        epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-1. * self.steps_done / EPSILON_DECAY)
+        if random.random() > epsilon:
+            with torch.no_grad():
+                return self.policy_net(*map(lambda x:x.unsqueeze(0).to(self.device),state)).argmax(dim=1).item()  # 最適な行動
+        else:
+            choice = range(n_actions)
+            if force_safe_action:
+                choice = list(filter(lambda x: move(game_state,Direction.index(x))[0]==TurnResult.CONTINUE, choice))
+                if len(choice) == 0:
+                    choice = range(n_actions)
+            return random.choice(list(choice))  # ランダムな行動
 
-                #ベースモデルが指定されている場合はロード, 指定されていない新規作成
-                if task['baseModelId'] is None:
-                    model = EvaluatorModel()
-                    optimizer = None
+    # 学習ステップ
+    def optimize_model(self):
+        if len(self.memory) < BATCH_SIZE:
+            return
+        transitions = self.memory.sample(BATCH_SIZE)
+        batch = list(zip(*transitions))
+
+        board_state_batch = torch.tensor(np.array(batch[0]), dtype=torch.float32).to(self.device)
+        game_state_batch = torch.tensor(np.array(batch[1]), dtype=torch.float32).to(self.device)
+
+        action_batch = torch.tensor(batch[2]).unsqueeze(1).to(self.device)
+        reward_batch = torch.tensor(batch[3], dtype=torch.float32).unsqueeze(1).to(self.device)
+        reward_batch = reward_batch.clamp(-1, 1)
+        next_board_state_batch = torch.tensor(np.array(batch[4]), dtype=torch.float32).to(self.device)
+        next_game_state_batch = torch.tensor(np.array(batch[5]), dtype=torch.float32).to(self.device)
+        done_batch = torch.tensor(batch[6], dtype=torch.float32).unsqueeze(1).to(self.device)
+
+        # Q値を計算
+        state_action_values = self.policy_net(board_state_batch,game_state_batch).gather(1, action_batch)
+        next_state_values = self.target_net(next_board_state_batch,next_game_state_batch).max(1)[0].detach().unsqueeze(1)
+        expected_state_action_values = reward_batch + (GAMMA * next_state_values * (1 - done_batch))
+
+        # 損失関数
+        criterion = nn.MSELoss()
+        loss = criterion(state_action_values, expected_state_action_values)
+
+        # ネットワーク更新
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+    def start_callback(self, game_state):
+        self.total_reward = 0
+        return 0
+
+    def move_callback(self, game_state):
+        next_state_tensor = Evaluator.get_input_tensor(game_state)
+        if game_state["turn"] > 0:
+            reward = 0.1
+            weight = 1
+            you = game_state["you"]
+            if len(game_state["board"]["snakes"]) == 2:
+                opponent = list(filter(lambda snake:snake["id"] != you["id"],game_state["board"]["snakes"]))[0]
+                if you["length"] > opponent["length"]:
+                    reward += 0.1
+
+            if game_state["you"]["health"] == 100:
+                reward += 0.1
+
+            self.total_reward += reward
+            reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, next_state_tensor[0], next_state_tensor[1], False, weight)
+            self.optimize_model()
+        self.last_state_tensor = next_state_tensor
+        self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
+        self.steps_done += 1
+        return Direction.index(self.last_action)
+
+    def end_callback(self, game_state):
+        self.next_state_tensor = Evaluator.get_input_tensor(game_state)
+        return 0
+
+    def finalize(self):
+        print("Training finished!")
+        # モデルの保存
+        evaluator = Evaluator()
+        evaluator.model = self.policy_net
+        evaluator.model.save("./checkpoint.pth")
+        print("Saved model")
+
+    def task_reinforced(self, initial_episode):
+        # トレーニングループ
+        num_episodes = 50000
+        opponent = Evaluator()
+        episode = initial_episode
+        turns = []
+        for eps in range(num_episodes - initial_episode):
+            episode += 1
+            evaluator = Evaluator()
+            evaluator.model = self.policy_net
+            evaluator.model.eval()
+            client1 = Client()
+            client1.on_start = self.start_callback
+            client1.on_move = lambda game_state: self.move_callback(game_state)
+            client1.on_end = self.end_callback
+            opponent.model.load_state_dict(self.target_net.state_dict())
+            player = AIPlayer(opponent, True)
+            client2 = Client()
+            client2.on_start = player.on_start
+            client2.on_move = player.on_move
+            client2.on_end = player.on_end
+            setting = GameSettings()
+            setting.seed = random.randint(0, 10000000)
+            setting.width = 11
+            setting.height = 11
+            setting.food_spawn_chance = 15
+            setting.minimum_food = 1
+            result = start_duel_game(client1, client2, setting)
+
+            #ゲーム終了時のスコアを学習
+            reward = 1
+            weight = 2
+            if result["result"] == "win":
+                reward += 10
+            elif result["result"] == "lose":
+                if result["cause"] == "wall-collision":
+                    reward -= 10
+                elif result["cause"] == "snake-self-collision":
+                    reward -= 10
+                elif result["cause"] == "snake-collision":
+                    reward -= 5
+                elif result["cause"] == "head-collision":
+                    reward -= 3
                 else:
-                    model,optimizer = self.load_model(task['baseModelId'])
-                    if model is None:
-                        raise Exception(f"Failed to load model({task['baseModelId']})")
+                    reward -= 5
 
-                if task['type'] == 'SUPERVISED': #教師あり学習
-                    result = self.task_supervised(model, optimizer,task)
-                    if not self.cancel:
-                        self.api_client.submit_model(assignment_id, int(datetime.now().timestamp()*1000), result)
-                else:
-                    raise Exception("Unknown task", task)
-            except Exception as e:
-                print(traceback.format_exc())
-                self.logger.error(f"Error occurred during training: {e}")
-                self.api_client.post_error(assignment_id, traceback.format_exc(), version_str)
-            finally:
-                self.logger.debug("Timer canceled")
-                self.timer.cancel()
+            self.total_reward += reward
+            reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, self.next_state_tensor[0], self.next_state_tensor[1], True, weight)
+            self.optimize_model()
+
+            # ターゲットネットワークの更新
+            if episode % TARGET_UPDATE == 0:
+                self.target_net.load_state_dict(self.policy_net.state_dict())\
+
+            if episode % 500 == 0:
+                evaluator.model.save(f"./checkpoint.pth")
+                # turnsをcsvに保存
+                with open("./turns.csv", "w") as f:
+                    f.write("episode,turn\n")
+                    for i, t in enumerate(turns):
+                        f.write(f"{i},{t}\n")
+
+            print(f"Episode {episode}: Turn{result["turn"]}, Total Reward: {self.total_reward}")
+            turns.append(result["turn"])
+            if self.cancel_token.is_cancellation_requested():
+                break
+        self.finalize()
+        self.policy_net.eval()
+        buffer = io.BytesIO()
+        torch.save({
+            'model': self.policy_net.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'target': self.target_net.state_dict(),
+            'memory': self.memory.memory,
+            'episode': episode
+        }, buffer)
+        return buffer.getvalue()
+
+
+    def start(self, task):
+        data = None
+        episode = 0
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=LR)
+        if task['baseModelId'] is not None:
+            data = self.load_model(task['baseModelId'])
+            self.policy_net.load_state_dict(data['model'])
+            self.optimizer.load_state_dict(data['optimizer'])
+            if 'target' in data:
+                self.target_net.load_state_dict(data['target'])
+            if 'memory' in data:
+                self.memory.memory = data['memory']
+            if 'episode' in data:
+                episode = data['episode']
+
+        return self.task_reinforced(episode)
 
 def train(api_url: str, logger:Logger, cache_all:bool):
     if not file_exists_and_not_empty("client.json"):
@@ -239,5 +425,76 @@ def train(api_url: str, logger:Logger, cache_all:bool):
         client = json.loads(s)
     logger.info(f"Start training as {client["id"]}")
     api_client = ApiClientImpl(api_url=api_url, secret_key=client["secret"], cache_all=cache_all)
-    # api_client = TestApiClient()
-    Trainer(logger).start(api_client)
+
+    def sig_handler(signum, frame) -> None:
+        nonlocal logger
+        logger.info("Received signal")
+        logger.info("Canceling training...")
+        sys.exit(1)
+
+    #期限が近いた時に呼ばれるコールバック
+    def timeout_callback(to_id) -> None:
+        nonlocal deadline_timer, cancel_token, api_client, logger, deadline
+        resp = api_client.refresh_assignment(to_id) #タスクの期限を更新
+        #期限が更新できなかった場合, タスクをキャンセル
+        if resp is None:
+            cancel_token.request_cancel()
+            logger.debug(f"Failed to refresh assignment({to_id}). Task is canceled.")
+            return
+        deadline = datetime.fromtimestamp(resp['deadline']/1000)
+
+        #タイマーを再設定
+        deadline_timer.cancel()
+        time_out = (deadline - datetime.now()).total_seconds() - 10
+        deadline_timer = threading.Timer(time_out, timeout_callback, args=[to_id])
+        deadline_timer.start()
+        logger.debug(f"Assignment({to_id}) is refreshed. New deadline is {deadline}")
+
+    #トレーニングを開始する
+    signal.signal(signal.SIGINT, sig_handler) #シグナルハンドラを設定
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.debug(f"Start training on device {device}")
+
+    while True:
+        print("--------------------------------------------")
+        logger.info("Get next assignment...")
+        assignment = api_client.get_assignment()
+
+        #タスクがない場合, 2分待って再度取得
+        if assignment is None:
+            logger.info("No task is assigned. Wait for 2 minutes and try again.")
+            sleep(120)
+            continue
+
+        assignment_id = assignment['id']
+        task = assignment['task']
+        deadline = datetime.fromtimestamp(assignment['deadline']/1000)
+
+        logger.info(f"Received assignment({assignment_id}) [deadline:{deadline}]",)
+        logger.info(f"Start training for {task}")
+
+        #タイマーを設定
+        timeout = (deadline - datetime.now()).total_seconds() - 10
+        deadline_timer = threading.Timer(timeout, timeout_callback, args=[assignment_id])
+
+        try:
+            cancel_token = CancelToken()
+            deadline_timer.start()
+
+            if task['type'] == 'SUPERVISED': #教師あり学習
+                result = SupervisedTrainer(logger, api_client, device, cancel_token).start(task)
+            elif task['type'] == 'REINFORCEMENT': #強化学習
+                result = ReinforcementTrainer(logger, api_client, device, cancel_token).start(task)
+            else:
+                raise Exception("Unknown task", task)
+
+            if not cancel_token.is_cancellation_requested():
+                api_client.submit_model(assignment_id, int(datetime.now().timestamp()*1000), result)
+        except Exception as e:
+            print(traceback.format_exc())
+            logger.error(f"Error occurred during training: {e}")
+            api_client.post_error(assignment_id, traceback.format_exc(), version_str)
+        finally:
+            logger.debug("Timer canceled")
+            deadline_timer.cancel()
