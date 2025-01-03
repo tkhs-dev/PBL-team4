@@ -202,10 +202,12 @@ GAMMA = 0.99  # 割引率
 LR = 0.0005   # 学習率
 BATCH_SIZE = 64
 EPSILON_START = 1.0
-EPSILON_END = 0.05
-EPSILON_DECAY = 20000
-MEMORY_CAPACITY = 10000
-TARGET_UPDATE = 200
+EPSILON_END = 0.01
+EPISODES = 100000
+EPSILON_DECAY = 30000 # steps
+MEMORY_CAPACITY = 100000 # steps
+TARGET_UPDATE = 200 # episodes
+START_STEP = 10000 # steps
 
 class ReinforcementTrainer(Trainer):
 
@@ -228,7 +230,7 @@ class ReinforcementTrainer(Trainer):
     # ε-greedyポリシー
     def select_action(self, game_state, state, n_actions, force_safe_action=False):
         epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-1. * self.steps_done / EPSILON_DECAY)
-        if random.random() > epsilon:
+        if (self.steps_done > START_STEP) and (random.random() > epsilon):
             with torch.no_grad():
                 return self.policy_net(*map(lambda x:x.unsqueeze(0).to(self.device),state)).argmax(dim=1).item()  # 最適な行動
         else:
@@ -241,6 +243,8 @@ class ReinforcementTrainer(Trainer):
 
     # 学習ステップ
     def optimize_model(self):
+        if self.steps_done < START_STEP:
+            return
         if len(self.memory) < BATCH_SIZE:
             return
         transitions = self.memory.sample(BATCH_SIZE)
@@ -258,7 +262,8 @@ class ReinforcementTrainer(Trainer):
 
         # Q値を計算
         state_action_values = self.policy_net(board_state_batch,game_state_batch).gather(1, action_batch)
-        next_state_values = self.target_net(next_board_state_batch,next_game_state_batch).max(1)[0].detach().unsqueeze(1)
+        next_action = self.policy_net(next_board_state_batch,next_game_state_batch).max(1)[1].unsqueeze(1)
+        next_state_values = self.target_net(next_board_state_batch,next_game_state_batch).gather(1, next_action)
         expected_state_action_values = reward_batch + (GAMMA * next_state_values * (1 - done_batch))
 
         # 損失関数
@@ -283,10 +288,12 @@ class ReinforcementTrainer(Trainer):
             if len(game_state["board"]["snakes"]) == 2:
                 opponent = list(filter(lambda snake:snake["id"] != you["id"],game_state["board"]["snakes"]))[0]
                 if you["length"] > opponent["length"]:
-                    reward += 0.1
+                    reward += 0.2
+                else:
+                    reward -= 0.2
 
             if game_state["you"]["health"] == 100:
-                reward += 0.1
+                reward += 5
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
@@ -311,7 +318,7 @@ class ReinforcementTrainer(Trainer):
 
     def task_reinforced(self, initial_episode):
         # トレーニングループ
-        num_episodes = 50000
+        num_episodes = EPISODES
         opponent = Evaluator()
         episode = initial_episode
         turns = []
@@ -339,21 +346,30 @@ class ReinforcementTrainer(Trainer):
             result = start_duel_game(client1, client2, setting)
 
             #ゲーム終了時のスコアを学習
-            reward = 1
-            weight = 2
+            reward = 0
+            weight = 4
             if result["result"] == "win":
-                reward += 10
+                if result["turn"] < 100:
+                    if result["kill"] != "head-collision":
+                        reward += 30
+                else:
+                    if result["kill"] != "head-collision":
+                        reward += 30
+                    else:
+                        reward += 20
             elif result["result"] == "lose":
                 if result["cause"] == "wall-collision":
                     reward -= 10
                 elif result["cause"] == "snake-self-collision":
-                    reward -= 10
+                    reward -= 20
                 elif result["cause"] == "snake-collision":
-                    reward -= 5
+                    reward -= 20
                 elif result["cause"] == "head-collision":
-                    reward -= 3
+                    reward -= 10
                 else:
-                    reward -= 5
+                    reward -= 10
+            else:
+                reward -= 20
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
@@ -361,19 +377,20 @@ class ReinforcementTrainer(Trainer):
             self.optimize_model()
 
             # ターゲットネットワークの更新
-            if episode % TARGET_UPDATE == 0:
-                self.target_net.load_state_dict(self.policy_net.state_dict())\
+            if (self.steps_done > START_STEP) and (episode % TARGET_UPDATE == 0):
+                self.target_net.load_state_dict(self.policy_net.state_dict())
 
-            if episode % 500 == 0:
+            if (self.steps_done > START_STEP) and (episode % 500 == 0):
                 evaluator.model.save(f"./checkpoint.pth")
                 # turnsをcsvに保存
                 with open("./turns.csv", "w") as f:
-                    f.write("episode,turn\n")
-                    for i, t in enumerate(turns):
-                        f.write(f"{i},{t}\n")
+                    f.write("episode,turn,result,reward\n")
+                    for i, res in enumerate(turns):
+                        t,r,tr = res
+                        f.write(f"{i},{t},{r},{tr}\n")
 
             print(f"Episode {episode}: Turn{result["turn"]}, Total Reward: {self.total_reward}")
-            turns.append(result["turn"])
+            turns.append([result["turn"], result["cause"], self.total_reward])
             if self.cancel_token.is_cancellation_requested():
                 break
         self.finalize()
@@ -407,6 +424,12 @@ class ReinforcementTrainer(Trainer):
         return self.task_reinforced(episode)
 
 def train(api_url: str, logger:Logger, cache_all:bool):
+    task = {
+        "type": "REINFORCEMENT",
+        "baseModelId": None,
+    }
+    ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda'), CancelToken()).start(task)
+    exit(0)
     if not file_exists_and_not_empty("client.json"):
         logger.debug("client.json is empty. Register client first.")
         if not file_exists_and_not_empty("user.txt"):
