@@ -77,21 +77,89 @@ class DuelDataset(Dataset):
         target = self.datas[idx]['target']
         return input_tensor, target
 
-class ReplayMemory:
+class SumTree:
+    write = 0
+
     def __init__(self, capacity):
-        self.memory = deque(maxlen=capacity)
-        self.weights = deque(maxlen=capacity)
+        self.capacity = capacity
+        self.tree = np.zeros( 2*capacity - 1 )
+        self.data = np.zeros( capacity, dtype=object )
 
-    def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done, weight=1):
-        self.memory.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
-        self.weights.append(weight)
+    def _propagate(self, idx, change):
+        parent = (idx - 1) // 2
+
+        self.tree[parent] += change
+
+        if parent != 0:
+            self._propagate(parent, change)
+
+    def _retrieve(self, idx, s):
+        left = 2 * idx + 1
+        right = left + 1
+
+        if left >= len(self.tree):
+            return idx
+
+        if s <= self.tree[left]:
+            return self._retrieve(left, s)
+        else:
+            return self._retrieve(right, s-self.tree[left])
+
+    def total(self):
+        return self.tree[0]
+
+    def add(self, p, data):
+        idx = self.write + self.capacity - 1
+
+        self.data[self.write] = data
+        self.update(idx, p)
+
+        self.write += 1
+        if self.write >= self.capacity:
+            self.write = 0
+
+    def update(self, idx, p):
+        change = p - self.tree[idx]
+
+        self.tree[idx] = p
+        self._propagate(idx, change)
+
+    def get(self, s):
+        idx = self._retrieve(0, s)
+        dataIdx = idx - self.capacity + 1
+
+        return (idx, self.tree[idx], self.data[dataIdx])
+
+    def sample(self):
+        s = random.uniform(0, self.total())
+        idx, p, data = self.get(s)
+        return idx, p, data
+
+class ReplayMemory:
+    def __init__(self, capacity, alpha=0.6, beta=0.4):
+        self.memory = SumTree(capacity)
+        self.alpha = alpha
+        self.beta = beta
+        self.epsilon = 0.0001
+
+    def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done):
+        self.memory.add(1,(board_state, game_state, action, reward, next_board_state, next_game_state, done))
 
 
-    def sample(self, batch_size):
-        return random.choices(self.memory, k=batch_size, weights=self.weights)
+    def sample(self, batch_size, step_progress):
+        total = self.memory.total()
+        beta = self.beta
+        for i in range(batch_size):
+            idx, p, data = self.memory.sample()
+            weight = (1/(total*p)) ** (beta + (1-beta) * step_progress)
+            yield idx, weight, data
+
+    def update(self, idx, error):
+        p = (np.abs(error) + self.epsilon) ** self.alpha
+        self.memory.update(idx, p)
 
     def __len__(self):
-        return len(self.memory)
+        return self.memory.write
 
 class Trainer:
     def __init__(self, logger, api_client:ApiClient, device, cancel_token:CancelToken):
@@ -199,15 +267,15 @@ class SupervisedTrainer(Trainer):
 
 # ハイパーパラメータ
 GAMMA = 0.99  # 割引率
-LR = 0.0005   # 学習率
+LR = 0.00025   # 学習率
 BATCH_SIZE = 64
-EPSILON_START = 1.0
+EPSILON_START = 1
 EPSILON_END = 0.01
-EPISODES = 100000
+EPISODES = 1000000
 EPSILON_DECAY = 30000 # steps
-MEMORY_CAPACITY = 100000 # steps
-TARGET_UPDATE = 200 # episodes
-START_STEP = 10000 # steps
+MEMORY_CAPACITY = 1000000 # steps
+TARGET_UPDATE = 1000 # episodes
+START_STEP = 30000 # steps
 
 class ReinforcementTrainer(Trainer):
 
@@ -247,9 +315,17 @@ class ReinforcementTrainer(Trainer):
             return
         if len(self.memory) < BATCH_SIZE:
             return
-        transitions = self.memory.sample(BATCH_SIZE)
-        batch = list(zip(*transitions))
+        samples = self.memory.sample(BATCH_SIZE, self.steps_done / MEMORY_CAPACITY)
+        # タプルのリストを別々のリストに分解
+        idxs = []
+        transitions = []
+        weights = []
+        for idx, weight, data in samples:
+            idxs.append(idx)
+            transitions.append(data)
+            weights.append(weight)
 
+        batch = list(zip(*transitions))
         board_state_batch = torch.tensor(np.array(batch[0]), dtype=torch.float32).to(self.device)
         game_state_batch = torch.tensor(np.array(batch[1]), dtype=torch.float32).to(self.device)
 
@@ -270,6 +346,10 @@ class ReinforcementTrainer(Trainer):
         criterion = nn.MSELoss()
         loss = criterion(state_action_values, expected_state_action_values)
 
+        weighted_loss = loss * torch.tensor(weights, dtype=torch.float32).to(self.device)
+        for i in range(BATCH_SIZE):
+            self.memory.update(idxs[i], weighted_loss[i].item())
+
         # ネットワーク更新
         self.optimizer.zero_grad()
         loss.backward()
@@ -283,7 +363,6 @@ class ReinforcementTrainer(Trainer):
         next_state_tensor = Evaluator.get_input_tensor(game_state)
         if game_state["turn"] > 0:
             reward = 0.1
-            weight = 1
             you = game_state["you"]
             if len(game_state["board"]["snakes"]) == 2:
                 opponent = list(filter(lambda snake:snake["id"] != you["id"],game_state["board"]["snakes"]))[0]
@@ -293,11 +372,14 @@ class ReinforcementTrainer(Trainer):
                     reward -= 0.2
 
             if game_state["you"]["health"] == 100:
-                reward += 5
+                if game_state["you"]["length"] > 15:
+                    reward += 0.2
+                else:
+                    reward += 0.4
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
-            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, next_state_tensor[0], next_state_tensor[1], False, weight)
+            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
             self.optimize_model()
         self.last_state_tensor = next_state_tensor
         self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
@@ -347,33 +429,32 @@ class ReinforcementTrainer(Trainer):
 
             #ゲーム終了時のスコアを学習
             reward = 0
-            weight = 4
             if result["result"] == "win":
-                if result["turn"] < 100:
+                if result["turn"] < 40:
                     if result["kill"] != "head-collision":
-                        reward += 30
+                        reward += 10
                 else:
                     if result["kill"] != "head-collision":
-                        reward += 30
+                        reward += 10
                     else:
-                        reward += 20
+                        reward += 10
             elif result["result"] == "lose":
                 if result["cause"] == "wall-collision":
                     reward -= 10
                 elif result["cause"] == "snake-self-collision":
-                    reward -= 20
+                    reward -= 10
                 elif result["cause"] == "snake-collision":
-                    reward -= 20
+                    reward -= 10
                 elif result["cause"] == "head-collision":
                     reward -= 10
                 else:
                     reward -= 10
             else:
-                reward -= 20
+                reward -= 10
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
-            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, self.next_state_tensor[0], self.next_state_tensor[1], True, weight)
+            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, self.next_state_tensor[0], self.next_state_tensor[1], True)
             self.optimize_model()
 
             # ターゲットネットワークの更新
@@ -410,6 +491,7 @@ class ReinforcementTrainer(Trainer):
         data = None
         episode = 0
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=LR)
+        # self.policy_net.load_state_dict(torch.load("C:\\Users\\tokuh\\IntelliJIDEAProjects\\PBL-team4\\duel\\trainer\\checkpoint.pth"))
         if task['baseModelId'] is not None:
             data = self.load_model(task['baseModelId'])
             self.policy_net.load_state_dict(data['model'])
@@ -428,7 +510,9 @@ def train(api_url: str, logger:Logger, cache_all:bool):
         "type": "REINFORCEMENT",
         "baseModelId": None,
     }
-    ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda'), CancelToken()).start(task)
+    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda'), CancelToken()).start(task)
+    with open("model.pth", "wb") as f:
+        f.write(bin)
     exit(0)
     if not file_exists_and_not_empty("client.json"):
         logger.debug("client.json is empty. Register client first.")
