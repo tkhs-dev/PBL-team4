@@ -103,11 +103,11 @@ def _is_head_out_of_bounds(game_state:dict, next_head:(int,int)) -> bool:
     return next_head["x"] < 0 or next_head["x"] >= game_state["board"]["width"] or next_head["y"] < 0 or next_head["y"] >= game_state["board"]["height"]
 
 def _is_head_colliding_with_self(game_state:dict, next_head:(int,int)) -> bool:
-    return next_head in game_state["you"]["body"][:game_state["you"]["length"]-1]
+    return next_head in game_state["you"]["body"][:-1]
 
 def _is_head_colliding_with_other_snake(game_state:dict, next_head:(int,int)) -> dict | None: #return snake dict or None
     for snake in game_state["board"]["snakes"]:
-        if next_head in snake["body"]:
+        if next_head in snake["body"] and snake["id"] != game_state["you"]["id"]:
             return snake
     return None
 
