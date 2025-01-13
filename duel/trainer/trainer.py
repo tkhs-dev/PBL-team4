@@ -6,7 +6,6 @@ import os
 import io
 import traceback
 import random
-from collections import deque
 from datetime import datetime
 from time import sleep
 
@@ -141,9 +140,10 @@ class ReplayMemory:
         self.alpha = alpha
         self.beta = beta
         self.epsilon = 0.0001
+        self.max_priority = 100
 
     def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done):
-        self.memory.add(1,(board_state, game_state, action, reward, next_board_state, next_game_state, done))
+        self.memory.add(self.max_priority,(board_state, game_state, action, reward, next_board_state, next_game_state, done))
 
 
     def sample(self, batch_size, step_progress):
@@ -267,15 +267,15 @@ class SupervisedTrainer(Trainer):
 
 # ハイパーパラメータ
 GAMMA = 0.99  # 割引率
-LR = 0.00025   # 学習率
+LR = 0.0001  # 学習率
 BATCH_SIZE = 64
 EPSILON_START = 1
 EPSILON_END = 0.01
-EPISODES = 1000000
+EPISODES = 100000
 EPSILON_DECAY = 30000 # steps
 MEMORY_CAPACITY = 1000000 # steps
-TARGET_UPDATE = 1000 # episodes
-START_STEP = 30000 # steps
+TARGET_UPDATE = 500 # episodes
+START_STEP = 10000 # steps
 
 class ReinforcementTrainer(Trainer):
 
@@ -367,15 +367,15 @@ class ReinforcementTrainer(Trainer):
             if len(game_state["board"]["snakes"]) == 2:
                 opponent = list(filter(lambda snake:snake["id"] != you["id"],game_state["board"]["snakes"]))[0]
                 if you["length"] > opponent["length"]:
-                    reward += 0.2
+                    reward += 0.1
                 else:
-                    reward -= 0.2
+                    reward -= 0.1
 
             if game_state["you"]["health"] == 100:
                 if game_state["you"]["length"] > 15:
-                    reward += 0.2
+                    reward += 0.1
                 else:
-                    reward += 0.4
+                    reward += 0.1
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
@@ -440,17 +440,17 @@ class ReinforcementTrainer(Trainer):
                         reward += 10
             elif result["result"] == "lose":
                 if result["cause"] == "wall-collision":
-                    reward -= 10
+                    reward -= 15
                 elif result["cause"] == "snake-self-collision":
                     reward -= 10
                 elif result["cause"] == "snake-collision":
-                    reward -= 10
+                    reward -= 15
                 elif result["cause"] == "head-collision":
                     reward -= 10
                 else:
                     reward -= 10
             else:
-                reward -= 10
+                reward -= 20
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
