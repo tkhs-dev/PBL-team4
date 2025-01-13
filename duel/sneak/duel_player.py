@@ -21,6 +21,7 @@ class AIPlayer(IPlayer):
     def on_move(self, game_state):
         q = self.evaluator.evaluate(game_state)
         if not self.safe:
+            print(game_state['turn'],list(map(lambda x:'{:.2f}'.format(x), q)))
             direction = max(zip(Direction,q), key = lambda x:x[1])[0]
             return direction
         safes = list(filter(lambda x:move(game_state,x[0])[0]!=TurnResult.LOSE, zip(Direction,q)))
