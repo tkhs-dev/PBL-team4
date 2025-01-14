@@ -25,6 +25,17 @@ class Direction(str,Enum):
             return 1,0
 
     @staticmethod
+    def index(direction) -> int:
+        if direction == Direction.DOWN:
+            return 1
+        elif direction == Direction.LEFT:
+            return 2
+        elif direction == Direction.RIGHT:
+            return 3
+        else:
+            return 0
+
+    @staticmethod
     def by_index(index):
         if index == 1:
             return Direction.DOWN
@@ -109,24 +120,27 @@ def is_move_maybe_safe(game_state:dict, direction:Direction) -> bool:
     elif _is_head_colliding_with_other_snake(game_state, next_head, True) is not None:
         return False
 
-def _get_next_head(game_state:dict, direction:Direction) -> (int,int):
-    head = copy.deepcopy(["you"]["head"])
-    return head["x"] + direction.get_direction_pair()[0], head["y"] + direction.get_direction_pair()[1]
-
-def _is_head_out_of_bounds(game_state:dict, next_head:(int,int)) -> bool:
+def _get_next_head(game_state:dict, direction:Direction) -> dict:
+    head = copy.deepcopy(game_state["you"]["head"])
+    dx,dy = direction.get_direction_pair()
+    head["x"] += dx
+    head["y"] += dy
+    return head
+def _is_head_out_of_bounds(game_state:dict, next_head) -> bool:
     return next_head["x"] < 0 or next_head["x"] >= game_state["board"]["width"] or next_head["y"] < 0 or next_head["y"] >= game_state["board"]["height"]
 
-def _is_head_colliding_with_self(game_state:dict, next_head:(int,int)) -> bool:
+def _is_head_colliding_with_self(game_state:dict, next_head) -> bool:
     return next_head in game_state["you"]["body"][:-1]
 
-def _is_head_colliding_with_other_snake(game_state:dict, next_head:(int,int), loose=False) -> dict | None: #return snake dict or None
+def _is_head_colliding_with_other_snake(game_state:dict, next_head, loose=False) -> dict | None: #return snake dict or None
     if loose:
         for snake in game_state["board"]["snakes"]:
-            snake["body"].pop()
+            if snake["body"]:
+                snake["body"].pop()
     for snake in game_state["board"]["snakes"]:
         if next_head in snake["body"] and snake["id"] != game_state["you"]["id"]:
             return snake
     return None
 
-def _is_head_colliding_with_food(game_state:dict, next_head:(int,int)) -> bool:
+def _is_head_colliding_with_food(game_state:dict, next_head) -> bool:
     return next_head in game_state["board"]["food"]

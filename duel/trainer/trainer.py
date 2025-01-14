@@ -374,7 +374,7 @@ class ReinforcementTrainer(Trainer):
             self.optimize_model()
         self.last_state_tensor = next_state_tensor
         self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
-        if is_move_maybe_safe(game_state, Direction(self.last_action)):
+        if is_move_maybe_safe(game_state, Direction.by_index(self.last_action)):
             self.last_corrected = True
         else:
             self.last_corrected = False
