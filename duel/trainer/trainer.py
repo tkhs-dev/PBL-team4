@@ -25,7 +25,7 @@ from duel.trainer.common import file_exists_and_not_empty, get_version_str
 from game_downloader import GameDownloader
 from shared import rule
 from shared.embedded_rules import GameSettings, Client, start_duel_game
-from shared.rule import Direction, TurnResult, move
+from shared.rule import Direction, TurnResult, move, is_move_maybe_safe
 
 version = "1.0.0"
 version_str = get_version_str(version)
@@ -268,7 +268,7 @@ class SupervisedTrainer(Trainer):
 # ハイパーパラメータ
 GAMMA = 0.99  # 割引率
 LR = 0.0001  # 学習率
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 EPSILON_START = 1
 EPSILON_END = 0.01
 EPISODES = 100000
@@ -294,19 +294,16 @@ class ReinforcementTrainer(Trainer):
         self.last_action = None
         self.last_state_tensor = None
         self.next_state_tensor = None
+        self.last_corrected = False
 
     # ε-greedyポリシー
-    def select_action(self, game_state, state, n_actions, force_safe_action=False):
+    def select_action(self, game_state, state, n_actions):
         epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-1. * self.steps_done / EPSILON_DECAY)
         if (self.steps_done > START_STEP) and (random.random() > epsilon):
             with torch.no_grad():
                 return self.policy_net(*map(lambda x:x.unsqueeze(0).to(self.device),state)).argmax(dim=1).item()  # 最適な行動
         else:
             choice = range(n_actions)
-            if force_safe_action:
-                choice = list(filter(lambda x: move(game_state,Direction.index(x))[0]==TurnResult.CONTINUE, choice))
-                if len(choice) == 0:
-                    choice = range(n_actions)
             return random.choice(list(choice))  # ランダムな行動
 
     # 学習ステップ
@@ -362,20 +359,14 @@ class ReinforcementTrainer(Trainer):
     def move_callback(self, game_state):
         next_state_tensor = Evaluator.get_input_tensor(game_state)
         if game_state["turn"] > 0:
-            reward = 0.1
-            you = game_state["you"]
-            if len(game_state["board"]["snakes"]) == 2:
-                opponent = list(filter(lambda snake:snake["id"] != you["id"],game_state["board"]["snakes"]))[0]
-                if you["length"] > opponent["length"]:
-                    reward += 0.1
-                else:
-                    reward -= 0.1
-
+            reward = 0
             if game_state["you"]["health"] == 100:
-                if game_state["you"]["length"] > 15:
-                    reward += 0.1
-                else:
-                    reward += 0.1
+                # When the snake ate food at the previous turn
+                reward = 1
+            elif not self.last_corrected:
+                reward = -5
+            else:
+                reward = -0.01
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
@@ -383,8 +374,16 @@ class ReinforcementTrainer(Trainer):
             self.optimize_model()
         self.last_state_tensor = next_state_tensor
         self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
+        if is_move_maybe_safe(game_state, Direction(self.last_action)):
+            self.last_corrected = True
+        else:
+            self.last_corrected = False
+            safe_moves = list(filter(lambda x: is_move_maybe_safe(game_state, x), Direction))
+            if len(safe_moves) > 0:
+                self.last_action = Direction.index(random.choice(safe_moves))
+
         self.steps_done += 1
-        return Direction.index(self.last_action)
+        return Direction.by_index(self.last_action)
 
     def end_callback(self, game_state):
         self.next_state_tensor = Evaluator.get_input_tensor(game_state)
@@ -432,25 +431,25 @@ class ReinforcementTrainer(Trainer):
             if result["result"] == "win":
                 if result["turn"] < 40:
                     if result["kill"] != "head-collision":
-                        reward += 10
+                        reward = 5
                 else:
                     if result["kill"] != "head-collision":
-                        reward += 10
+                        reward = 5
                     else:
-                        reward += 10
+                        reward = 5
             elif result["result"] == "lose":
                 if result["cause"] == "wall-collision":
-                    reward -= 15
+                    reward = -10
                 elif result["cause"] == "snake-self-collision":
-                    reward -= 10
+                    reward = -10
                 elif result["cause"] == "snake-collision":
-                    reward -= 15
+                    reward = -10
                 elif result["cause"] == "head-collision":
-                    reward -= 10
+                    reward = -10
                 else:
-                    reward -= 10
+                    reward = 10
             else:
-                reward -= 20
+                reward = -10
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
@@ -510,7 +509,7 @@ def train(api_url: str, logger:Logger, cache_all:bool):
         "type": "REINFORCEMENT",
         "baseModelId": None,
     }
-    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda'), CancelToken()).start(task)
+    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cpu'), CancelToken()).start(task)
     with open("model.pth", "wb") as f:
         f.write(bin)
     exit(0)
