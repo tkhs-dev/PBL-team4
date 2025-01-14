@@ -39,6 +39,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     from shared.server import run_server
     evaluator = Evaluator()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.model:
         if not os.path.exists("./cache"):
             os.makedirs("./cache")
@@ -56,8 +57,8 @@ if __name__ == "__main__":
     if args.zipped:
         import lzma
         with lzma.open(args.input, "rb") as f:
-            evaluator.model.load_state_dict(torch.load(f, weights_only=True)["model"])
+            evaluator.model.load_state_dict(torch.load(f, weights_only=True, map_location=device)["model"])
     else:
-        evaluator.model.load_state_dict(torch.load(args.input, weights_only=True))
+        evaluator.model.load_state_dict(torch.load(args.input, weights_only=True, map_location=device))
     player = AIPlayer(evaluator, safe=args.safe)
     run_server({"info":lambda :info(args), "start": player.on_start, "move": lambda game_state: {"move":player.on_move(game_state).value}, "end": player.on_end})
