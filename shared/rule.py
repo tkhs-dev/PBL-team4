@@ -119,6 +119,7 @@ def is_move_maybe_safe(game_state:dict, direction:Direction) -> bool:
         return False
     elif _is_head_colliding_with_other_snake(game_state, next_head, True) is not None:
         return False
+    return True
 
 def _get_next_head(game_state:dict, direction:Direction) -> dict:
     head = copy.deepcopy(game_state["you"]["head"])
