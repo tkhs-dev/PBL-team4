@@ -294,7 +294,6 @@ class ReinforcementTrainer(Trainer):
         self.last_action = None
         self.last_state_tensor = None
         self.next_state_tensor = None
-        self.last_corrected = False
 
     # ε-greedyポリシー
     def select_action(self, game_state, state, n_actions):
@@ -363,8 +362,6 @@ class ReinforcementTrainer(Trainer):
             if game_state["you"]["health"] == 100:
                 # When the snake ate food at the previous turn
                 reward = 1
-            elif not self.last_corrected:
-                reward = -5
             else:
                 reward = -0.01
 
@@ -374,10 +371,10 @@ class ReinforcementTrainer(Trainer):
             self.optimize_model()
         self.last_state_tensor = next_state_tensor
         self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
-        if is_move_maybe_safe(game_state, Direction.by_index(self.last_action)):
-            self.last_corrected = True
-        else:
-            self.last_corrected = False
+        if not is_move_maybe_safe(game_state, Direction.by_index(self.last_action)):
+            # 危険な行動をとろうとした場合、そのことを記憶、学習して安全な行動に置き換える
+            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, torch.tensor([-10], dtype=torch.float32).to(self.device), next_state_tensor[0], next_state_tensor[1], True)
+            self.optimize_model()
             safe_moves = list(filter(lambda x: is_move_maybe_safe(game_state, x), Direction))
             if len(safe_moves) > 0:
                 self.last_action = Direction.index(random.choice(safe_moves))
