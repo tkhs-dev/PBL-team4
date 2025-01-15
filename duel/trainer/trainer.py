@@ -135,15 +135,22 @@ class SumTree:
         return idx, p, data
 
 class ReplayMemory:
-    def __init__(self, capacity, alpha=0.6, beta=0.4):
+    def __init__(self, capacity, alpha=0.6, beta=0.4, rotation=False):
+        # if rotation is True, the memory will store 4 times more data by rotating the board
+        capacity = capacity * 4 if rotation else capacity
         self.memory = SumTree(capacity)
         self.alpha = alpha
         self.beta = beta
         self.epsilon = 0.0001
         self.max_priority = 100
+        self.rotation = rotation
 
     def push(self, board_state, game_state, action, reward, next_board_state, next_game_state, done):
-        self.memory.add(self.max_priority,(board_state, game_state, action, reward, next_board_state, next_game_state, done))
+        if self.rotation:
+            for angle in [0, 90, 180, 270]:
+                self.memory.add(self.max_priority,(rotate_board_tensor(board_state, angle), game_state, rotate_action(action, angle), reward, rotate_board_tensor(next_board_state, angle), next_game_state, done))
+        else:
+            self.memory.add(self.max_priority,(board_state, game_state, action, reward, next_board_state, next_game_state, done))
 
 
     def sample(self, batch_size, step_progress):
@@ -160,6 +167,28 @@ class ReplayMemory:
 
     def __len__(self):
         return self.memory.write
+
+rotation_map = {
+    0: [0, 1, 2, 3],   # 0度: そのまま
+    90: [3, 2, 0, 1],  # 90度: UP→RIGHT, DOWN→LEFT, LEFT→UP, RIGHT→DOWN
+    180: [1, 0, 3, 2], # 180度: UP→DOWN, DOWN→UP, LEFT→RIGHT, RIGHT→LEFT
+    270: [2, 3, 1, 0]  # 270度: UP→LEFT, DOWN→RIGHT, LEFT→DOWN, RIGHT→UP
+}
+def rotate_action(action:torch.Tensor, angle = 90):
+    action = action.item()
+    return torch.tensor(rotation_map[angle][action])
+
+def rotate_actions_batch(actions:torch.Tensor, angle = 90):
+    return torch.tensor([rotation_map[angle][action.item()] for action in actions])
+
+def rotate_board_tensor(board_state:torch.Tensor, angle = 90):
+    k = angle // 90
+    return torch.rot90(board_state, k, [2,1])
+
+def rotate_board_tensors_batch(board_states:torch.Tensor, angle = 90):
+    k = angle // 90
+    return torch.rot90(board_states, k, [3,2])
+
 
 class Trainer:
     def __init__(self, logger, api_client:ApiClient, device, cancel_token:CancelToken):
@@ -276,6 +305,7 @@ EPSILON_DECAY = 30000 # steps
 MEMORY_CAPACITY = 1000000 # steps
 TARGET_UPDATE = 500 # episodes
 START_STEP = 10000 # steps
+ROTATION = True
 
 class ReinforcementTrainer(Trainer):
 
@@ -287,7 +317,7 @@ class ReinforcementTrainer(Trainer):
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
         self.optimizer = None
-        self.memory = ReplayMemory(MEMORY_CAPACITY)
+        self.memory = ReplayMemory(MEMORY_CAPACITY,ROTATION)
         self.total_reward = 0
         self.steps_done = 0
 
