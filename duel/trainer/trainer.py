@@ -305,6 +305,7 @@ EPSILON_DECAY = 30000 # steps
 MEMORY_CAPACITY = 1000000 # steps
 TARGET_UPDATE = 500 # episodes
 START_STEP = 10000 # steps
+SAVE_STEP = 100 # episodes
 ROTATION = True
 
 class ReinforcementTrainer(Trainer):
@@ -389,11 +390,19 @@ class ReinforcementTrainer(Trainer):
         next_state_tensor = Evaluator.get_input_tensor(game_state)
         if game_state["turn"] > 0:
             reward = 0
+            opponent = None
+            if len(game_state["board"]["snakes"]) == 2:
+                opponent = list(filter(lambda x: x['id'] != game_state['you']['id'], game_state["board"]["snakes"]))[0]
             if game_state["you"]["health"] == 100:
-                # When the snake ate food at the previous turn
+                # エサを食べた時
                 reward = 1
             else:
-                reward = -0.01
+                # 相手よりも長い場合正の報酬、短い場合負の報酬
+                if opponent is not None:
+                    if len(opponent["body"]) < len(game_state["you"]["body"]):
+                        reward = 0.01
+                    else:
+                        reward = -0.01
 
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
@@ -401,13 +410,14 @@ class ReinforcementTrainer(Trainer):
             self.optimize_model()
         self.last_state_tensor = next_state_tensor
         self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
-        if not is_move_maybe_safe(game_state, Direction.by_index(self.last_action)):
-            # 危険な行動をとろうとした場合、そのことを記憶、学習して安全な行動に置き換える
-            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, torch.tensor([-10], dtype=torch.float32).to(self.device), next_state_tensor[0], next_state_tensor[1], True)
-            self.optimize_model()
-            safe_moves = list(filter(lambda x: is_move_maybe_safe(game_state, x), Direction))
-            if len(safe_moves) > 0:
-                self.last_action = Direction.index(random.choice(safe_moves))
+        if self.steps_done > START_STEP:
+            if not is_move_maybe_safe(game_state, Direction.by_index(self.last_action)):
+                # 危険な行動をとろうとした場合、そのことを記憶、学習して安全な行動に置き換える
+                self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, torch.tensor([-10], dtype=torch.float32).to(self.device), next_state_tensor[0], next_state_tensor[1], True)
+                self.optimize_model()
+                safe_moves = list(filter(lambda x: is_move_maybe_safe(game_state, x), Direction))
+                if len(safe_moves) > 0:
+                    self.last_action = Direction.index(random.choice(safe_moves))
 
         self.steps_done += 1
         return Direction.by_index(self.last_action)
@@ -487,7 +497,7 @@ class ReinforcementTrainer(Trainer):
             if (self.steps_done > START_STEP) and (episode % TARGET_UPDATE == 0):
                 self.target_net.load_state_dict(self.policy_net.state_dict())
 
-            if (self.steps_done > START_STEP) and (episode % 500 == 0):
+            if (self.steps_done > START_STEP) and (episode % SAVE_STEP == 0):
                 evaluator.model.save(f"./checkpoint.pth")
                 # turnsをcsvに保存
                 with open("./turns.csv", "w") as f:
@@ -536,7 +546,7 @@ def train(api_url: str, logger:Logger, cache_all:bool):
         "type": "REINFORCEMENT",
         "baseModelId": None,
     }
-    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cpu'), CancelToken()).start(task)
+    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'), CancelToken()).start(task)
     with open("model.pth", "wb") as f:
         f.write(bin)
     exit(0)
