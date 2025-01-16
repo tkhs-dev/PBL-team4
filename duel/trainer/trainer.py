@@ -65,8 +65,12 @@ class DuelDataset(Dataset):
             elif action == Direction.RIGHT:
                 target[3] += 1
             turn['target'] = torch.tensor(target, dtype=torch.float32)
-            self.datas.append(turn)
-
+            for i in [0, 90, 180, 270]:
+                rotated = {
+                    'input': (rotate_board_tensor(turn['input'][0], i),turn['input'][1]),
+                   'target': torch.roll(turn['target'], shifts={90: 2, 180: 3, 270: 1}.get(i % 360, 0), dims=0)
+                }
+                self.datas.append(rotated)
 
     def __len__(self):
         return len(self.datas)
