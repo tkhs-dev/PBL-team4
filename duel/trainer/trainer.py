@@ -541,14 +541,6 @@ class ReinforcementTrainer(Trainer):
         return self.task_reinforced(episode)
 
 def train(api_url: str, logger:Logger, cache_all:bool):
-    task = {
-        "type": "REINFORCEMENT",
-        "baseModelId": None,
-    }
-    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'), CancelToken()).start(task)
-    with open("model.pth", "wb") as f:
-        f.write(bin)
-    exit(0)
     if not file_exists_and_not_empty("client.json"):
         logger.debug("client.json is empty. Register client first.")
         if not file_exists_and_not_empty("user.txt"):
