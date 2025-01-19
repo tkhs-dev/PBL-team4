@@ -26,6 +26,6 @@ class AIPlayer(IPlayer):
             return direction
         safes = list(filter(lambda x:move(game_state,x[0])[0]!=TurnResult.LOSE, zip(Direction,q)))
         if len(safes) == 0:
-            return Direction.UP
+            return max(zip(Direction,q), key = lambda x:x[1])[0]
         direction = max(safes, key = lambda x:x[1])[0]
         return direction
