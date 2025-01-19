@@ -2,6 +2,10 @@ import argparse
 import sys
 from logging import getLogger, DEBUG, StreamHandler, Formatter, INFO
 
+import torch
+
+from api_client import TestApiClient
+from trainer import ReinforcementTrainer, CancelToken
 from trainer import train
 
 if __name__ == '__main__':
@@ -18,5 +22,14 @@ if __name__ == '__main__':
     ch.setFormatter(Formatter('[%(asctime)s %(levelname)s] %(message)s'))
     logger.setLevel(lvl)
     logger.addHandler(ch)
+
+    task = {
+        "type": "REINFORCEMENT",
+        "baseModelId": None,
+    }
+    bin = ReinforcementTrainer(logger, TestApiClient(), torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'), CancelToken()).start(task)
+    with open("model.pth", "wb") as f:
+        f.write(bin)
+    exit(0)
 
     train(api_url=args.api_url, logger=logger, cache_all=args.cache_all)
