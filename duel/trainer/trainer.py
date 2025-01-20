@@ -326,9 +326,9 @@ class ReinforcementTrainer(Trainer):
         self.total_reward = 0
         self.steps_done = 0
 
-        self.last_action = None
-        self.last_state_tensor = None
-        self.next_state_tensor = None
+        self.last_you = {}
+        self.last_opponent = {}
+        self.last_you_stack = False
         self.last_opponent_stack = False
 
     # ε-greedyポリシー
@@ -387,22 +387,16 @@ class ReinforcementTrainer(Trainer):
         loss.backward()
         self.optimizer.step()
 
-    def start_callback(self, game_state):
-        self.total_reward = 0
-        return 0
-
-    def move_callback(self, game_state):
-        next_state_tensor = Evaluator.get_input_tensor(game_state)
-        opponent = None
-        if len(game_state["board"]["snakes"]) == 2:
-            opponent = list(filter(lambda x: x['id'] != game_state['you']['id'], game_state["board"]["snakes"]))[0]
-        if game_state["turn"] > 0 and opponent is not None:
+    def calculate_reward(self, game_state):
+        if game_state["turn"] > 0 and len(game_state["board"]["snakes"]) == 2:
+            you = game_state["you"]
+            opponent = list(filter(lambda x: x['id'] != you["id"], game_state["board"]["snakes"]))[0]
             reward = 0
             if game_state["you"]["health"] == 100:
                 # エサを食べた時
                 reward = 1
             else:
-                head_y = game_state["you"]["head"]
+                head_y = you["head"]
                 head_o = opponent["head"]
                 dx = head_y["x"] - head_o["x"]
                 dy = head_y["y"] - head_o["y"]
@@ -410,30 +404,30 @@ class ReinforcementTrainer(Trainer):
                     # 相手の頭とx座標が隣接している場合
                     if head_o["x"] == 0:
                         # 相手が壁に隣接している場合
-                        if {"x": 1, "y": head_o["y"]} in game_state["you"]["body"][1:]:
+                        if {"x": 1, "y": head_o["y"]} in you["body"][1:]:
                             # 相手の頭の右に自分の体がある場合
                             reward = 1
                         else:
                             # 相手の頭の右に自分の体がない場合
                             if np.abs(dy) < 3:
-                                if game_state["you"]["length"] <= opponent["length"]:
+                                if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
                                     reward = 0.5
                     elif head_o["x"] == 10:
                         # 相手が壁に隣接している場合
-                        if {"x": 9, "y": head_o["y"]} in game_state["you"]["body"][1:]:
+                        if {"x": 9, "y": head_o["y"]} in you["body"][1:]:
                             # 相手の頭の左に自分の体がある場合
                             reward = 1
                         else:
                             # 相手の頭の左に自分の体がない場合
                             if np.abs(dy) < 3:
-                                if game_state["you"]["length"] <= opponent["length"]:
+                                if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
                                     reward = 0.5
                     elif np.abs(dy) == 1:
-                        if game_state["you"]["length"] <= opponent["length"]:
+                        if you["length"] <= opponent["length"]:
                             reward = -1
                         else:
                             reward = 1
@@ -442,34 +436,34 @@ class ReinforcementTrainer(Trainer):
                     # 相手の頭とy座標が隣接している場合
                     if head_o["y"] == 0:
                         # 相手が壁に隣接している場合
-                        if {"x": head_o["x"], "y": 1} in game_state["you"]["body"][1:]:
+                        if {"x": head_o["x"], "y": 1} in you["body"][1:]:
                             # 相手の頭の下に自分の体がある場合
                             reward = 1
                         else:
                             # 相手の頭の下に自分の体がない場合
                             if np.abs(dx) < 3:
-                                if game_state["you"]["length"] <= opponent["length"]:
+                                if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
                                     reward = 0.5
                     elif head_o["y"] == 10:
                         # 相手が壁に隣接している場合
-                        if {"x": head_o["x"], "y": 9} in game_state["you"]["body"][1:]:
+                        if {"x": head_o["x"], "y": 9} in you["body"][1:]:
                             # 相手の頭の上に自分の体がある場合
                             reward = 1
                         else:
                             # 相手の頭の上に自分の体がない場合
                             if np.abs(dx) < 3:
-                                if game_state["you"]["length"] <= opponent["length"]:
+                                if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
                                     reward = 0.5
                     elif np.abs(dx) == 1:
-                        if game_state["you"]["length"] <= opponent["length"]:
+                        if you["length"] <= opponent["length"]:
                             reward = -1
                         else:
                             reward = 1
-                elif opponent["length"] < game_state["you"]["length"]:
+                elif opponent["length"] < you["length"]:
                     # 相手の体が自分の体より短い場合
                     if len(game_state["you"]["body"]) -len(opponent["body"]) < 8:
                         reward = np.exp(-1. * game_state["turn"]/100) + 1
@@ -478,30 +472,92 @@ class ReinforcementTrainer(Trainer):
                 else:
                     reward = -0.1
 
+            return reward
+        return 0
+
+    def calculate_result_reward(self, result, turn, kill, cause, opponent_stack):
+        reward = 0
+        if result == "win":
+            if turn < 40:
+                if kill != "head-collision":
+                    reward = 5
+            else:
+                if kill != "head-collision":
+                    reward = 5
+                elif opponent_stack:
+                    reward = 7
+                else:
+                    reward = 2
+        elif result == "lose":
+            if cause == "wall-collision":
+                reward = -10
+            elif cause == "snake-self-collision":
+                reward = -10
+            elif cause == "snake-collision":
+                reward = -10
+            elif cause == "head-collision":
+                reward = -10
+            else:
+                reward = 10
+        else:
+            reward = -10
+        return reward
+
+
+    def start_callback(self, game_state):
+        self.total_reward = 0
+        return 0
+
+    def move_callback(self, game_state):
+        next_state_tensor = Evaluator.get_input_tensor(game_state)
+        if game_state["turn"] > 0 and len(game_state["board"]["snakes"]) == 2:
+            last_state_tensor = self.last_you["state"]
+            last_action = self.last_you["action"]
+
+            reward = self.calculate_reward(game_state)
             self.total_reward += reward
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
-            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
+            self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
             self.optimize_model()
-        self.last_state_tensor = next_state_tensor
-        self.last_action = self.select_action(game_state,self.last_state_tensor, 4)
-        if not is_move_maybe_safe(game_state, Direction.by_index(self.last_action)):
+
+        if len(game_state["board"]["snakes"]) != 2:
+            return Direction.UP
+
+        self.last_you["state"] = next_state_tensor
+        action = self.select_action(game_state, next_state_tensor, 4)
+        if not is_move_maybe_safe(game_state, Direction.by_index(action)):
             # 危険な行動をとろうとした場合、そのことを記憶、学習して安全な行動に置き換える
-            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, torch.tensor([-10], dtype=torch.float32).to(self.device), next_state_tensor[0], next_state_tensor[1], True)
+            self.memory.push(next_state_tensor[0], next_state_tensor[1], action, torch.tensor([-10], dtype=torch.float32).to(self.device), next_state_tensor[0], next_state_tensor[1], True)
             self.optimize_model()
             safe_moves = list(filter(lambda x: is_move_maybe_safe(game_state, x), Direction))
             if len(safe_moves) > 0:
-                self.last_action = Direction.index(random.choice(safe_moves))
+                action = Direction.index(random.choice(safe_moves))
+                self.last_you_stack = False
+            else:
+                self.last_you_stack = True
 
         self.steps_done += 1
-        return Direction.by_index(self.last_action)
+        self.last_you["action"] = action
+        return Direction.by_index(action)
 
     def end_callback(self, game_state):
-        self.next_state_tensor = Evaluator.get_input_tensor(game_state)
         return 0
 
-    def opponent_move_callback(self, game_state, player):
-        move = player.on_move(game_state)
+    def opponent_move_callback(self, game_state, move_cb):
+        state_tensor = Evaluator.get_input_tensor(game_state)
+        move = move_cb(game_state)
+        if game_state["turn"] > 0:
+            last_state_tensor = self.last_opponent["state"]
+            last_action = self.last_opponent["action"]
+            reward = self.calculate_reward(game_state)
+            self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, torch.tensor([reward], dtype=torch.float32).to(self.device), state_tensor[0], state_tensor[1], False)
+
         self.last_opponent_stack = not is_move_maybe_safe(game_state, move)
+        if len(game_state["board"]["snakes"]) == 2:
+            self.last_opponent = {
+                "state": state_tensor,
+                "action": Direction.index(move)
+            }
         return move
 
 
@@ -535,7 +591,7 @@ class ReinforcementTrainer(Trainer):
             player = AIPlayer(opponent, True)
             client2 = Client()
             client2.on_start = player.on_start
-            client2.on_move = lambda game_state: self.opponent_move_callback(game_state, player)
+            client2.on_move = lambda game_state: self.opponent_move_callback(game_state, player.on_move)
             client2.on_end = player.on_end
             setting = GameSettings()
             setting.seed = random.randint(0, 10000000)
@@ -545,36 +601,26 @@ class ReinforcementTrainer(Trainer):
             setting.minimum_food = 1
             result = start_duel_game(client1, client2, setting)
 
-            #ゲーム終了時のスコアを学習
-            reward = 0
-            if result["result"] == "win":
-                if result["turn"] < 40:
-                    if result["kill"] != "head-collision":
-                        reward = 5
-                else:
-                    if result["kill"] != "head-collision":
-                        reward = 5
-                    elif self.last_opponent_stack:
-                        reward = 7
-                    else:
-                        reward = 2
-            elif result["result"] == "lose":
-                if result["cause"] == "wall-collision":
-                    reward = -10
-                elif result["cause"] == "snake-self-collision":
-                    reward = -10
-                elif result["cause"] == "snake-collision":
-                    reward = -10
-                elif result["cause"] == "head-collision":
-                    reward = -10
-                else:
-                    reward = 10
-            else:
-                reward = -10
-
+            # ゲーム終了時の自身のスコアを学習
+            reward = self.calculate_result_reward(result["result"], result["turn"], result["kill"], result["cause"], self.last_opponent_stack)
             self.total_reward += reward
+            last_state_tensor = self.last_you["state"]
+            last_action = self.last_you["action"]
             reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
-            self.memory.push(self.last_state_tensor[0], self.last_state_tensor[1], self.last_action, reward, self.next_state_tensor[0], self.next_state_tensor[1], True)
+            self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, reward, last_state_tensor[0], last_state_tensor[1], True)
+
+            # ゲーム終了時の相手のスコアを学習
+            res = "draw"
+            if result["result"] == "win":
+                res = "lose"
+            elif result["result"] == "lose":
+                res = "win"
+            reward = self.calculate_result_reward(res, result["turn"], result["cause"], result["kill"], self.last_you_stack)
+            last_state_tensor = self.last_opponent["state"]
+            last_action = self.last_opponent["action"]
+            reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+            self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, reward, last_state_tensor[0], last_state_tensor[1], True)
+
             self.optimize_model()
 
             # ターゲットネットワークの更新
