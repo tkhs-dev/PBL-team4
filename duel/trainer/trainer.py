@@ -179,7 +179,6 @@ rotation_map = {
     270: [2, 3, 1, 0]  # 270度: UP→LEFT, DOWN→RIGHT, LEFT→DOWN, RIGHT→UP
 }
 def rotate_action(action:torch.Tensor, angle = 90):
-    action = action.item()
     return torch.tensor(rotation_map[angle][action])
 
 def rotate_actions_batch(actions:torch.Tensor, angle = 90):
@@ -305,12 +304,12 @@ BATCH_SIZE = 32
 EPSILON_START = 1
 EPSILON_END = 0.1
 EPISODES = 100000
-EPSILON_DECAY = 300000 # steps
-MEMORY_CAPACITY = 1000000 # steps
+EPSILON_DECAY = 1000000 # steps
+MEMORY_CAPACITY = 3000000 # steps
 TARGET_UPDATE = 200 # episodes
 START_STEP = 10000 # steps
 SAVE_STEP = 100 # episodes
-ROTATION = True
+ROTATION = False
 
 class ReinforcementTrainer(Trainer):
 
@@ -354,7 +353,9 @@ class ReinforcementTrainer(Trainer):
         weights = []
         for idx, weight, data in samples:
             idxs.append(idx)
-            transitions.append(data)
+            board_state, game_state, action, reward, next_board_state, next_game_state, done = data
+            for angle in [0, 90, 180, 270]:
+                transitions.append((rotate_board_tensor(board_state, angle), game_state, rotate_action(action, angle), reward, rotate_board_tensor(next_board_state, angle), next_game_state, done))
             weights.append(weight)
 
         batch = list(zip(*transitions))
@@ -394,13 +395,69 @@ class ReinforcementTrainer(Trainer):
             reward = 0
             if game_state["you"]["health"] == 100:
                 # エサを食べた時
-                reward = 1
+                reward = 0.01
             else:
                 head_y = you["head"]
                 head_o = opponent["head"]
                 dx = head_y["x"] - head_o["x"]
                 dy = head_y["y"] - head_o["y"]
-                if np.abs(dx) == 1:
+                if np.abs(dx) == 1 and np.abs(dy) == 1:
+                    # 相手の頭とx座標, y座標が隣接している場合
+                    if head_o["x"] == 0 or head_o["x"] == 10:
+                        # 相手が壁に隣接している場合
+                        if head_o["x"] == 0:
+                            if {"x": 1, "y": head_o["y"]} in you["body"][1:]:
+                                # 相手の頭の右に自分の体がある場合
+                                reward = 2
+                            else:
+                                # 相手の頭の右に自分の体がない場合
+                                if np.abs(dy) < 3:
+                                    if you["length"] <= opponent["length"]:
+                                        reward = -0.5
+                                    else:
+                                        reward = 0.5
+                        elif head_o["x"] == 10:
+                            if {"x": 9, "y": head_o["y"]} in you["body"][1:]:
+                                # 相手の頭の左に自分の体がある場合
+                                reward = 2
+                            else:
+                                # 相手の頭の左に自分の体がない場合
+                                if np.abs(dy) < 3:
+                                    if you["length"] <= opponent["length"]:
+                                        reward = -0.5
+                                    else:
+                                        reward = 0.5
+                    elif head_o["y"] == 0 or head_o["y"] == 10:
+                        # 相手が壁に隣接している場合
+                        if head_o["y"] == 0:
+                            if {"x": head_o["x"], "y": 1} in you["body"][1:]:
+                                # 相手の頭の下に自分の体がある場合
+                                reward = 2
+                            else:
+                                # 相手の頭の下に自分の体がない場合
+                                if np.abs(dx) < 3:
+                                    if you["length"] <= opponent["length"]:
+                                        reward = -0.5
+                                    else:
+                                        reward = 0.5
+                        elif head_o["y"] == 10:
+                            if {"x": head_o["x"], "y": 9} in you["body"][1:]:
+                                # 相手の頭の上に自分の体がある場合
+                                reward = 2
+                            else:
+                                # 相手の頭の上に自分の体がない場合
+                                if np.abs(dx) < 3:
+                                    if you["length"] <= opponent["length"]:
+                                        reward = -0.5
+                                    else:
+                                        reward = 0.5
+                    elif you["length"] <= opponent["length"]:
+                        # 頭接触で負ける可能性あり
+                        reward = -1
+                    else:
+                        # 頭接触で勝てる可能性あり
+                        reward = 0.5
+                elif np.abs(dx) == 1:
                     # 相手の頭とx座標が隣接している場合
                     if head_o["x"] == 0:
                         # 相手が壁に隣接している場合
@@ -426,11 +483,6 @@ class ReinforcementTrainer(Trainer):
                                     reward = -1
                                 else:
                                     reward = 0.5
-                    elif np.abs(dy) == 1:
-                        if you["length"] <= opponent["length"]:
-                            reward = -1
-                        else:
-                            reward = 1
 
                 elif np.abs(dy) == 1:
                     # 相手の頭とy座標が隣接している場合
@@ -458,11 +510,7 @@ class ReinforcementTrainer(Trainer):
                                     reward = -1
                                 else:
                                     reward = 0.5
-                    elif np.abs(dx) == 1:
-                        if you["length"] <= opponent["length"]:
-                            reward = -1
-                        else:
-                            reward = 1
+
                 elif opponent["length"] < you["length"]:
                     # 相手の体が自分の体より短い場合
                     if len(game_state["you"]["body"]) -len(opponent["body"]) < 8:
@@ -480,14 +528,14 @@ class ReinforcementTrainer(Trainer):
         if result == "win":
             if turn < 40:
                 if kill != "head-collision":
-                    reward = 5
+                    reward = 3
             else:
                 if kill != "head-collision":
-                    reward = 5
+                    reward = 3
                 elif opponent_stack:
-                    reward = 7
+                    reward = 20
                 else:
-                    reward = 2
+                    reward = 15
         elif result == "lose":
             if cause == "wall-collision":
                 reward = -10
@@ -584,10 +632,10 @@ class ReinforcementTrainer(Trainer):
             client1.on_start = self.start_callback
             client1.on_move = lambda game_state: self.move_callback(game_state)
             client1.on_end = self.end_callback
-            if random.random() <= 5:
+            if random.random() <= 0.7:
                 opponent.model.load_state_dict(self.target_net.state_dict())
             else:
-                opponent.model.load("C:\\Users\\tokuh\\OneDrive - OUMail (Osaka University)\\checkpoint4.pth")
+                opponent.model.load("C:\\Users\\tokuh\\OneDrive - OUMail (Osaka University)\\checkpoint6.pth")
             player = AIPlayer(opponent, True)
             client2 = Client()
             client2.on_start = player.on_start
@@ -635,6 +683,14 @@ class ReinforcementTrainer(Trainer):
                     for i, res in enumerate(turns):
                         t,r,tr = res
                         f.write(f"{i},{t},{r},{tr}\n")
+            # if (self.steps_done > START_STEP) and (episode % (SAVE_STEP * 10) == 0):
+            #     torch.save({
+            #         'model': self.policy_net.state_dict(),
+            #         'optimizer': self.optimizer.state_dict(),
+            #         'target': self.target_net.state_dict(),
+            #         'memory': self.memory.memory,
+            #         'episode': episode
+            #     }, f"./continuable.pth")
 
             print(f"Episode {episode}: Turn{result["turn"]}, Total Reward: {self.total_reward}")
             turns.append([result["turn"], result["cause"], self.total_reward])

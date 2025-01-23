@@ -34,9 +34,9 @@ class Evaluator:
         sneak1_tail_board = np.zeros((11,11), dtype=np.int32)
         food_board = np.zeros((11,11), dtype=np.int32)
         you = game_state["you"]
-        for body in you["body"]:
+        for index, body in enumerate(you["body"]):
             if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
-                sneak0_body_board[body["y"]][body["x"]] = 1
+                sneak0_body_board[body["y"]][body["x"]] = 1 + index
         if 0 <= you["head"]["x"] < 11 and 0 <= you["head"]["y"] < 11:
             sneak0_head_board[you["head"]["y"]][you["head"]["x"]] = 1
         sneak0_tail = you["body"][-1]
@@ -47,9 +47,9 @@ class Evaluator:
         if len(game_state["board"]["snakes"]) == 2:
             sneak1 = list(filter(lambda x:x['id']!=you['id'],game_state["board"]["snakes"]))[0]
             sneak1_length = len(sneak1["body"])
-            for body in sneak1["body"]:
+            for index, body in enumerate(sneak1["body"]):
                 if 0 <= body["x"] < 11 and 0 <= body["y"] < 11:
-                    sneak1_body_board[body["y"]][body["x"]] = 1
+                    sneak1_body_board[body["y"]][body["x"]] = 1 + index
             if 0 <= sneak1["head"]["x"] < 11 and 0 <= sneak1["head"]["y"] < 11:
                 sneak1_head_board[sneak1["head"]["y"]][sneak1["head"]["x"]] = 1
             sneak1_tail = sneak1["body"][-1]
