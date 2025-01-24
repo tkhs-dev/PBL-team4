@@ -354,8 +354,11 @@ class ReinforcementTrainer(Trainer):
         for idx, weight, data in samples:
             idxs.append(idx)
             board_state, game_state, action, reward, next_board_state, next_game_state, done = data
-            for angle in [0, 90, 180, 270]:
-                transitions.append((rotate_board_tensor(board_state, angle), game_state, rotate_action(action, angle), reward, rotate_board_tensor(next_board_state, angle), next_game_state, done))
+            if abs(reward.item()) < 0.1:
+                transitions.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
+            else:
+                for angle in [0, 90, 180, 270]:
+                    transitions.append((rotate_board_tensor(board_state, angle), game_state, rotate_action(action, angle), reward, rotate_board_tensor(next_board_state, angle), next_game_state, done))
             weights.append(weight)
 
         batch = list(zip(*transitions))
@@ -395,13 +398,15 @@ class ReinforcementTrainer(Trainer):
             reward = 0
             if game_state["you"]["health"] == 100:
                 # エサを食べた時
-                reward = 0.01
+                reward = 0.05
             else:
                 head_y = you["head"]
                 head_o = opponent["head"]
                 dx = head_y["x"] - head_o["x"]
                 dy = head_y["y"] - head_o["y"]
-                if np.abs(dx) == 1 and np.abs(dy) == 1:
+                adx = abs(dx)
+                ady = abs(dy)
+                if adx == 1 and ady == 1:
                     # 相手の頭とx座標, y座標が隣接している場合
                     if head_o["x"] == 0 or head_o["x"] == 10:
                         # 相手が壁に隣接している場合
@@ -411,7 +416,7 @@ class ReinforcementTrainer(Trainer):
                                 reward = 2
                             else:
                                 # 相手の頭の右に自分の体がない場合
-                                if np.abs(dy) < 3:
+                                if ady < 3:
                                     if you["length"] <= opponent["length"]:
                                         reward = -0.5
                                     else:
@@ -422,7 +427,7 @@ class ReinforcementTrainer(Trainer):
                                 reward = 2
                             else:
                                 # 相手の頭の左に自分の体がない場合
-                                if np.abs(dy) < 3:
+                                if ady < 3:
                                     if you["length"] <= opponent["length"]:
                                         reward = -0.5
                                     else:
@@ -435,7 +440,7 @@ class ReinforcementTrainer(Trainer):
                                 reward = 2
                             else:
                                 # 相手の頭の下に自分の体がない場合
-                                if np.abs(dx) < 3:
+                                if adx < 3:
                                     if you["length"] <= opponent["length"]:
                                         reward = -0.5
                                     else:
@@ -446,7 +451,7 @@ class ReinforcementTrainer(Trainer):
                                 reward = 2
                             else:
                                 # 相手の頭の上に自分の体がない場合
-                                if np.abs(dx) < 3:
+                                if adx < 3:
                                     if you["length"] <= opponent["length"]:
                                         reward = -0.5
                                     else:
@@ -457,7 +462,7 @@ class ReinforcementTrainer(Trainer):
                     else:
                         # 頭接触で勝てる可能性あり
                         reward = 0.5
-                elif np.abs(dx) == 1:
+                elif adx == 1:
                     # 相手の頭とx座標が隣接している場合
                     if head_o["x"] == 0:
                         # 相手が壁に隣接している場合
@@ -466,7 +471,7 @@ class ReinforcementTrainer(Trainer):
                             reward = 1
                         else:
                             # 相手の頭の右に自分の体がない場合
-                            if np.abs(dy) < 3:
+                            if ady < 3:
                                 if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
@@ -478,13 +483,13 @@ class ReinforcementTrainer(Trainer):
                             reward = 1
                         else:
                             # 相手の頭の左に自分の体がない場合
-                            if np.abs(dy) < 3:
+                            if ady < 3:
                                 if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
                                     reward = 0.5
 
-                elif np.abs(dy) == 1:
+                elif ady == 1:
                     # 相手の頭とy座標が隣接している場合
                     if head_o["y"] == 0:
                         # 相手が壁に隣接している場合
@@ -493,7 +498,7 @@ class ReinforcementTrainer(Trainer):
                             reward = 1
                         else:
                             # 相手の頭の下に自分の体がない場合
-                            if np.abs(dx) < 3:
+                            if adx < 3:
                                 if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
@@ -505,7 +510,7 @@ class ReinforcementTrainer(Trainer):
                             reward = 1
                         else:
                             # 相手の頭の上に自分の体がない場合
-                            if np.abs(dx) < 3:
+                            if adx < 3:
                                 if you["length"] <= opponent["length"]:
                                     reward = -1
                                 else:
@@ -514,7 +519,7 @@ class ReinforcementTrainer(Trainer):
                 elif opponent["length"] < you["length"]:
                     # 相手の体が自分の体より短い場合
                     if len(game_state["you"]["body"]) -len(opponent["body"]) < 8:
-                        reward = np.exp(-1. * game_state["turn"]/100) + 1
+                        reward = np.exp(-1. * game_state["turn"]/100)
                     else:
                         reward = -0.01
                 else:
