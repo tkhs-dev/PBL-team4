@@ -4,8 +4,7 @@
 #--dependencies--
 #Flask==2.3.2
 #requests
-#torch
-#deap
+#torch==2.5.1
 #numpy
 
 import os

@@ -25,7 +25,7 @@ from duel.trainer.common import file_exists_and_not_empty, get_version_str
 from game_downloader import GameDownloader
 from shared import rule
 from shared.embedded_rules import GameSettings, Client, start_duel_game
-from shared.rule import Direction, TurnResult, move, is_move_maybe_safe
+from shared.rule import Direction, TurnResult, move, is_move_maybe_safe, get_reachable_cells, dict_coord_to_tuple
 
 version = "1.0.0"
 version_str = get_version_str(version)
@@ -305,11 +305,11 @@ EPSILON_START = 1
 EPSILON_END = 0.1
 EPISODES = 100000
 EPSILON_DECAY = 1000000 # steps
-MEMORY_CAPACITY = 3000000 # steps
+MEMORY_CAPACITY = 1000000 # steps
 TARGET_UPDATE = 200 # episodes
 START_STEP = 10000 # steps
 SAVE_STEP = 100 # episodes
-ROTATION = False
+ROTATION = True
 
 class ReinforcementTrainer(Trainer):
 
@@ -353,23 +353,24 @@ class ReinforcementTrainer(Trainer):
         weights = []
         for idx, weight, data in samples:
             idxs.append(idx)
-            board_state, game_state, action, reward, next_board_state, next_game_state, done = data
-            if abs(reward.item()) < 0.1:
-                transitions.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
-            else:
-                for angle in [0, 90, 180, 270]:
-                    transitions.append((rotate_board_tensor(board_state, angle), game_state, rotate_action(action, angle), reward, rotate_board_tensor(next_board_state, angle), next_game_state, done))
+            transitions.append(data)
+            # board_state, game_state, action, reward, next_board_state, next_game_state, done = data
+            # if abs(reward.item()) < 0.5:
+            #     transitions.append((board_state, game_state, action, reward, next_board_state, next_game_state, done))
+            # else:
+            #     for angle in [0, 90, 180, 270]:
+            #         transitions.append((rotate_board_tensor(board_state, angle), game_state, rotate_action(action, angle), reward, rotate_board_tensor(next_board_state, angle), next_game_state, done))
             weights.append(weight)
 
         batch = list(zip(*transitions))
-        board_state_batch = torch.tensor(np.array(batch[0]), dtype=torch.float32).to(self.device)
-        game_state_batch = torch.tensor(np.array(batch[1]), dtype=torch.float32).to(self.device)
+        board_state_batch = torch.stack(batch[0]).to(self.device)
+        game_state_batch = torch.stack(batch[1]).to(self.device)
 
         action_batch = torch.tensor(batch[2]).unsqueeze(1).to(self.device)
-        reward_batch = torch.tensor(batch[3], dtype=torch.float32).unsqueeze(1).to(self.device)
+        reward_batch = torch.stack(batch[3]).to(self.device)
         reward_batch = reward_batch.clamp(-1, 1)
-        next_board_state_batch = torch.tensor(np.array(batch[4]), dtype=torch.float32).to(self.device)
-        next_game_state_batch = torch.tensor(np.array(batch[5]), dtype=torch.float32).to(self.device)
+        next_board_state_batch = torch.stack(batch[4]).to(self.device)
+        next_game_state_batch = torch.stack(batch[5]).to(self.device)
         done_batch = torch.tensor(batch[6], dtype=torch.float32).unsqueeze(1).to(self.device)
 
         # Q値を計算
@@ -377,7 +378,6 @@ class ReinforcementTrainer(Trainer):
         next_action = self.policy_net(next_board_state_batch,next_game_state_batch).max(1)[1].unsqueeze(1)
         next_state_values = self.target_net(next_board_state_batch,next_game_state_batch).gather(1, next_action)
         expected_state_action_values = reward_batch + (GAMMA * next_state_values * (1 - done_batch))
-
         # 損失関数
         criterion = nn.MSELoss()
         loss = criterion(state_action_values, expected_state_action_values)
@@ -398,7 +398,7 @@ class ReinforcementTrainer(Trainer):
             reward = 0
             if game_state["you"]["health"] == 100:
                 # エサを食べた時
-                reward = 0.05
+                reward = 0.1
             else:
                 head_y = you["head"]
                 head_o = opponent["head"]
@@ -516,6 +516,12 @@ class ReinforcementTrainer(Trainer):
                                 else:
                                     reward = 0.5
 
+                elif head_o["x"] == 0 or head_o["x"] == 10 or head_o["y"] == 0 or head_o["y"] == 10:
+                    reward = 0.5
+
+                elif adx+ady < 4 and (head_y["x"] == 0 or head_y["x"] == 10 or head_y["y"] == 0 or head_y["y"] == 10) :
+                    reward = -0.5
+
                 elif opponent["length"] < you["length"]:
                     # 相手の体が自分の体より短い場合
                     if len(game_state["you"]["body"]) -len(opponent["body"]) < 8:
@@ -524,6 +530,9 @@ class ReinforcementTrainer(Trainer):
                         reward = -0.01
                 else:
                     reward = -0.1
+
+                if (adx+ady) < 7:
+                    reward += 10/(len(get_reachable_cells(game_state, dict_coord_to_tuple(head_o), 5)) + 1)
 
             return reward
         return 0
@@ -569,7 +578,7 @@ class ReinforcementTrainer(Trainer):
 
             reward = self.calculate_reward(game_state)
             self.total_reward += reward
-            reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+            reward = torch.tensor([reward], dtype=torch.float32)
             self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, reward, next_state_tensor[0], next_state_tensor[1], False)
             self.optimize_model()
 
@@ -580,7 +589,7 @@ class ReinforcementTrainer(Trainer):
         action = self.select_action(game_state, next_state_tensor, 4)
         if not is_move_maybe_safe(game_state, Direction.by_index(action)):
             # 危険な行動をとろうとした場合、そのことを記憶、学習して安全な行動に置き換える
-            self.memory.push(next_state_tensor[0], next_state_tensor[1], action, torch.tensor([-10], dtype=torch.float32).to(self.device), next_state_tensor[0], next_state_tensor[1], True)
+            self.memory.push(next_state_tensor[0], next_state_tensor[1], action, torch.tensor([-10], dtype=torch.float32), next_state_tensor[0], next_state_tensor[1], True)
             self.optimize_model()
             safe_moves = list(filter(lambda x: is_move_maybe_safe(game_state, x), Direction))
             if len(safe_moves) > 0:
@@ -603,7 +612,7 @@ class ReinforcementTrainer(Trainer):
             last_state_tensor = self.last_opponent["state"]
             last_action = self.last_opponent["action"]
             reward = self.calculate_reward(game_state)
-            self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, torch.tensor([reward], dtype=torch.float32).to(self.device), state_tensor[0], state_tensor[1], False)
+            self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, torch.tensor([reward], dtype=torch.float32), state_tensor[0], state_tensor[1], False)
 
         self.last_opponent_stack = not is_move_maybe_safe(game_state, move)
         if len(game_state["board"]["snakes"]) == 2:
@@ -637,7 +646,7 @@ class ReinforcementTrainer(Trainer):
             client1.on_start = self.start_callback
             client1.on_move = lambda game_state: self.move_callback(game_state)
             client1.on_end = self.end_callback
-            if random.random() <= 0.7:
+            if random.random() <= 1:
                 opponent.model.load_state_dict(self.target_net.state_dict())
             else:
                 opponent.model.load("C:\\Users\\tokuh\\OneDrive - OUMail (Osaka University)\\checkpoint6.pth")
@@ -659,7 +668,7 @@ class ReinforcementTrainer(Trainer):
             self.total_reward += reward
             last_state_tensor = self.last_you["state"]
             last_action = self.last_you["action"]
-            reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+            reward = torch.tensor([reward], dtype=torch.float32)
             self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, reward, last_state_tensor[0], last_state_tensor[1], True)
 
             # ゲーム終了時の相手のスコアを学習
@@ -671,7 +680,7 @@ class ReinforcementTrainer(Trainer):
             reward = self.calculate_result_reward(res, result["turn"], result["cause"], result["kill"], self.last_you_stack)
             last_state_tensor = self.last_opponent["state"]
             last_action = self.last_opponent["action"]
-            reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+            reward = torch.tensor([reward], dtype=torch.float32)
             self.memory.push(last_state_tensor[0], last_state_tensor[1], last_action, reward, last_state_tensor[0], last_state_tensor[1], True)
 
             self.optimize_model()

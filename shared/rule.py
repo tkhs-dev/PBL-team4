@@ -1,6 +1,8 @@
 import copy
 from enum import Enum
 
+import numpy as np
+
 
 class TurnResult(Enum):
     CONTINUE = 0
@@ -76,6 +78,9 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
     #他の蛇の情報を更新
     for snake in next_state["board"]["snakes"]:
         if snake["id"] == next_state["you"]["id"]:
+            snake["body"] = next_state["you"]["body"]
+            snake["head"] = next_state["you"]["head"]
+            snake["health"] = next_state["you"]["health"]
             continue
         if snake["body"][-1] == snake["head"]:
             snake["body"].pop()
@@ -120,6 +125,84 @@ def is_move_maybe_safe(game_state:dict, direction:Direction) -> bool:
     elif _is_head_colliding_with_other_snake(game_state, next_head, True) is not None:
         return False
     return True
+
+def is_move_do_nothing(game_state:dict, direction:Direction) -> bool:
+    next_head = _get_next_head(game_state, direction)
+    return not _is_head_out_of_bounds(game_state, next_head) and not _is_head_colliding_with_self(game_state, next_head) and _is_head_colliding_with_other_snake(game_state, next_head) is None and not _is_head_colliding_with_food(game_state, next_head)
+
+def get_reachable_cells(game_state:dict, start:(int,int), max_distance):
+    board = np.zeros((game_state["board"]["width"], game_state["board"]["height"]))
+    for sneak in game_state["board"]["snakes"]:
+        for index, cell in enumerate(reversed(sneak["body"])):
+            board[cell["x"], cell["y"]] = index + 1
+    rows = game_state["board"]["width"]
+    cols = game_state["board"]["height"]
+    queue = [(*start, 0)]
+    directions = list(map(lambda x: x.get_direction_pair(), Direction))
+    reachable_cells = set()
+    visited = set()
+    while queue:
+        x, y, distance = queue.pop(0)
+        if distance > max_distance:
+            continue
+        reachable_cells.add((x, y))
+        visited.add((x, y))
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if (nx < 0 or nx >= rows or ny < 0 or ny >= cols) or (nx, ny) in visited:
+                continue
+            if board[nx, ny] - distance > 0:
+                continue
+            queue.append((nx, ny, distance + 1))
+    reachable_cells.remove(start)
+    return reachable_cells
+
+def get_shortest_path(game_state:dict, start:(int,int), goal:(int,int), additional_obstacles=None, max_distance=15):
+    if additional_obstacles is None:
+        additional_obstacles = []
+    board = np.zeros((game_state["board"]["width"], game_state["board"]["height"]))
+    for sneak in game_state["board"]["snakes"]:
+        for index, cell in enumerate(reversed(sneak["body"][1:])):
+            board[cell["x"], cell["y"]] = index + 1
+    for obstacle in additional_obstacles:
+        board[obstacle[0], obstacle[1]] = 100
+    rows = game_state["board"]["width"]
+    cols = game_state["board"]["height"]
+    queue = [(*start, 0, [])]
+    directions = list(map(lambda x: x.get_direction_pair(), Direction))
+    visited = set()
+    while queue:
+        x, y, distance, path = queue.pop(0)
+        path = path + [(x, y)]
+        if (x, y) == goal:
+            path.remove(start)
+            return path
+        visited.add((x, y))
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if (nx < 0 or nx >= rows or ny < 0 or ny >= cols) or (nx, ny) in visited:
+                continue
+            if board[nx, ny] - distance > 0:
+                continue
+            if distance + 1 > max_distance:
+                continue
+            queue.append((nx, ny, distance + 1, path))
+    return []
+
+def get_shortest_path_length(game_state:dict, start:(int,int), goal:(int,int), additional_obstacles=None, max_distance=15):
+    return len(get_shortest_path(game_state, start, goal, additional_obstacles, max_distance))
+
+def dict_coord_to_tuple(dict_coord):
+    return dict_coord["x"], dict_coord["y"]
+
+def get_opponent_snake(game_state:dict):
+    for snake in game_state["board"]["snakes"]:
+        if snake["id"] != game_state["you"]["id"]:
+            return snake
+
+def get_distance_to_opponent(game_state:dict):
+    opponent = get_opponent_snake(game_state)
+    return abs(game_state["you"]["head"]["x"] - opponent["head"]["x"]) + abs(game_state["you"]["head"]["y"] - opponent["head"]["y"])
 
 def _get_next_head(game_state:dict, direction:Direction) -> dict:
     head = copy.deepcopy(game_state["you"]["head"])
