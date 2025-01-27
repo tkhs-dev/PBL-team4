@@ -64,6 +64,8 @@ def move(game_state:dict, direction:Direction) -> (TurnResult, dict):
         next_state["you"]["health"] = 100
         next_state["you"]["length"] += 1
         next_state["you"]["head"] = next_head ##蛇の頭を更新
+        tail = next_state["you"]["body"][-1]
+        next_state["you"]["body"].append(tail) #蛇の長さを更新
         next_state["you"]["body"].insert(0, next_head) #蛇の頭を更新
         next_state["board"]["food"].remove(next_head)
     else:
@@ -125,6 +127,15 @@ def is_move_maybe_safe(game_state:dict, direction:Direction) -> bool:
     elif _is_head_colliding_with_other_snake(game_state, next_head, True) is not None:
         return False
     return True
+
+def is_move_dangerous(game_state:dict, direction:Direction) -> bool:
+    if not is_move_maybe_safe(game_state, direction):
+        return True
+    next_head = _get_next_head(game_state, direction)
+    opponent = get_opponent_snake(game_state)
+    if calculate_manhattan_distance(dict_coord_to_tuple(next_head), dict_coord_to_tuple(opponent["head"])) == 1:
+        return True
+    return False
 
 def is_move_do_nothing(game_state:dict, direction:Direction) -> bool:
     next_head = _get_next_head(game_state, direction)
@@ -192,6 +203,24 @@ def get_shortest_path(game_state:dict, start:(int,int), goal:(int,int), addition
 def get_shortest_path_length(game_state:dict, start:(int,int), goal:(int,int), additional_obstacles=None, max_distance=15):
     return len(get_shortest_path(game_state, start, goal, additional_obstacles, max_distance))
 
+def get_nearest_foods(game_state:dict, start:(int,int), max_distance=15):
+    # 最も距離の近い餌の座標を返す. 同じ距離の場合はリストで返す
+    foods = game_state["board"]["food"]
+    if not foods:
+        return None
+    min_distance = float("inf")
+    nearest_foods = []
+    for food in foods:
+        distance = get_shortest_path_length(game_state, start, dict_coord_to_tuple(food), max_distance=max_distance)
+        if 0 < distance < min_distance:
+            min_distance = distance
+            nearest_foods = [(food["x"], food["y"])]
+        elif distance == min_distance:
+            nearest_foods.append((food["x"], food["y"]))
+    if min_distance > max_distance:
+        return None
+    return nearest_foods
+
 def dict_coord_to_tuple(dict_coord):
     return dict_coord["x"], dict_coord["y"]
 
@@ -200,9 +229,12 @@ def get_opponent_snake(game_state:dict):
         if snake["id"] != game_state["you"]["id"]:
             return snake
 
+def calculate_manhattan_distance(start:(int,int), goal:(int,int)):
+    return abs(start[0] - goal[0]) + abs(start[1] - goal[1])
+
 def get_distance_to_opponent(game_state:dict):
     opponent = get_opponent_snake(game_state)
-    return abs(game_state["you"]["head"]["x"] - opponent["head"]["x"]) + abs(game_state["you"]["head"]["y"] - opponent["head"]["y"])
+    return calculate_manhattan_distance(dict_coord_to_tuple(game_state["you"]["head"]), dict_coord_to_tuple(opponent["head"]))
 
 def _get_next_head(game_state:dict, direction:Direction) -> dict:
     head = copy.deepcopy(game_state["you"]["head"])
@@ -210,6 +242,14 @@ def _get_next_head(game_state:dict, direction:Direction) -> dict:
     head["x"] += dx
     head["y"] += dy
     return head
+
+def _get_opponent_next_head(game_state:dict, direction:Direction) -> dict:
+    head = copy.deepcopy(get_opponent_snake(game_state)["head"])
+    dx,dy = direction.get_direction_pair()
+    head["x"] += dx
+    head["y"] += dy
+    return head
+
 def _is_head_out_of_bounds(game_state:dict, next_head) -> bool:
     return next_head["x"] < 0 or next_head["x"] >= game_state["board"]["width"] or next_head["y"] < 0 or next_head["y"] >= game_state["board"]["height"]
 
